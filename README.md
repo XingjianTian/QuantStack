@@ -1,74 +1,76 @@
 # QuantStack
 
-Personal quantitative research infrastructure with typed market-data contracts,
-offline replay, data-quality checks, a research API, NautilusTrader integration,
-and optional Stock Screener / Vibe-Trading adapters.
+**Market data you can trust. Research you can reproduce.**
 
-This is a research-only project. It provides no live broker execution.
-The brokerage sample uses fictional data and non-executable proposals.
+QuantStack connects market-data contracts, strategy specifications and NautilusTrader
+backtests in a self-hosted research workspace. Keep the inputs behind each experiment
+traceable, compare results consistently, and move between data and research tools
+without rebuilding the workflow for every strategy.
 
-## Development
+[Get started](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Market-data API](docs/MARKET_DATA_BATCH_API.md) · [Configuration](docs/ENVIRONMENT.md)
 
-Python 3.12–3.14, `uv`, and Gitleaks 8.25+ are required for the full offline test
-suite, including privacy-check integration tests. The suite uses the
-optional data, archive, brokerage, CN-provider and Nautilus dependencies:
+![QuantStack workflow: typed market data, versioned strategies, Nautilus backtests and traceable experiment evidence.](docs/assets/readme-workflow.svg)
+
+## Built for systematic research
+
+| Capability | What it gives you |
+| --- | --- |
+| **Consistent market data** | Typed CN/US data contracts, validation and provenance for a clearer research baseline. |
+| **Reproducible experiments** | Versioned strategy inputs, NautilusTrader backtests and experiment bundles that preserve the context behind a result. |
+| **A connected workspace** | A research API, Quant Center and Nautilus Lab, with optional Stock Screener and Vibe-Trading adapters. |
+
+Designed for researchers and developers building their own quantitative research
+infrastructure. The included workflow covers research and backtesting; it does not
+provide live order execution. Brokerage examples use fictional data and
+non-executable proposals.
+
+## Quick start
+
+Use Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```sh
+git clone https://github.com/XingjianTian/QuantStack.git
+cd QuantStack
 uv sync --frozen --all-extras
-uv run --no-env-file pytest
+uv run --no-env-file quant-stack validate-strategy strategies/examples/sma_cross/strategy_spec.yaml
 ```
 
-No Provider collection, production deployment or external service login is needed
-for the default suite. Tests that require omitted historical operations evidence,
-optional upstream checkouts, or a Lua runtime report an
-explicit skip. Their assertions are retained; these skips do not claim those
-integration or historical acceptance checks passed.
-
-## Private configuration
+To start the research API:
 
 ```sh
 cp .env.example .env
 chmod 600 .env
-# Fill .env with independent locally generated keys and deployment values.
-uv run --env-file .env quant-stack-api
+# Set an independent QUANT_API_KEY and local paths in .env.
+make api
 ```
 
-See [environment configuration](docs/ENVIRONMENT.md) for JSON templates, private
-gateway rendering, Docker secret preparation and Compose validation. The real
-`.env`, rendered files, credentials, local databases and build outputs are excluded
-from both Git and Docker build contexts. Never use frontend `VITE_*` variables for
-secrets.
+The web clients live in `apps/quant-center` and `apps/nautilus-lab`; optional upstream
+applications are separate deployments. See [environment configuration](docs/ENVIRONMENT.md)
+for service addresses, credentials, gateway setup and private runtime files.
 
-Public-source defaults are examples, container service names and loopback
-addresses. Personal hostnames, ports, proxy URLs and filesystem roots belong in
-the local `.env`. No existing NAS or other service is configured by cloning this
-repository.
+## Explore
 
-## Source boundaries
+- [Strategy lifecycle](docs/STRATEGY_LIFECYCLE.md) — how research and evidence fit together.
+- [Data management](docs/DATA_MANAGEMENT.md) — dataset boundaries and storage contracts.
+- [Brokerage sample](docs/SCHWAB_READONLY_SAMPLE.md) — a fictional read-only research workflow.
+- [Third-party notices](THIRD_PARTY_NOTICES.md) — upstream components and licenses.
 
-- Development conversations, historical handoffs, production receipts and private
-  acceptance evidence are retained in a separate private backup.
-- The public replay corpus contains deterministic synthetic OHLCV, not downloaded
-  market prices. Its compatibility labels do not establish real provider behavior
-  or actual acquisition provenance. Regenerate it with
-  `uv run --extra data python scripts/generate_public_replay_fixture.py`.
-- Source-provider URLs and API protocol identifiers describe public upstream
-  services. Provider libraries still require their own terms and access review
-  before live data acquisition.
-- Optional upstream sources are pinned in `VERSION_LOCK.json`. See
-  [third-party notices](THIRD_PARTY_NOTICES.md) and the included upstream license
-  copies. This repository does not grant a new license for the project's own code;
-  public visibility and open-source licensing are separate decisions.
+<details>
+<summary><strong>Development and verification</strong></summary>
 
-Useful documentation: [architecture](docs/ARCHITECTURE.md),
-[market-data API](docs/MARKET_DATA_BATCH_API.md),
-[fictional brokerage sample](docs/SCHWAB_READONLY_SAMPLE.md), and
-[configuration](docs/ENVIRONMENT.md).
+Install Gitleaks 8.25+, configure a GitHub noreply email, then enable the local
+privacy hook and run the offline suite:
 
-## Privacy before committing
+```sh
+make privacy-setup
+uv run --no-env-file pytest
+```
 
-The maintained repository is [QuantStack](https://github.com/XingjianTian/QuantStack).
-After cloning, install Gitleaks 8.25+, configure your GitHub noreply email and run
-`make privacy-setup`. Commits then check the complete staged snapshot, private
-paths and credentials. See [privacy checks](docs/PRIVACY.md) for local policy and
-verification limits.
+The public replay corpus is synthetic. Tests requiring private historical evidence
+or optional external integrations may report explicit skips; these are not passing
+integration checks. See [privacy checks](docs/PRIVACY.md) before contributing.
+
+</details>
+
+**License:** no project license has been selected. Third-party components retain
+their respective licenses.
