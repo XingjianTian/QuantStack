@@ -67,7 +67,7 @@ Useful documentation: [architecture](docs/ARCHITECTURE.md),
 
 ## Privacy before committing
 
-The maintained repository is [QuantStack-Public](https://github.com/XingjianTian/QuantStack-Public).
+The maintained repository is [QuantStack](https://github.com/XingjianTian/QuantStack).
 After cloning, install Gitleaks 8.25+, configure your GitHub noreply email and run
 `make privacy-setup`. Commits then check the complete staged snapshot, private
 paths and credentials. See [privacy checks](docs/PRIVACY.md) for local policy and

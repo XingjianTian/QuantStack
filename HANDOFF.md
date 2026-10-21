@@ -1,6 +1,6 @@
 # QuantStack maintenance
 
-The single maintained repository is https://github.com/XingjianTian/QuantStack-Public. Historical
+The single maintained repository is https://github.com/XingjianTian/QuantStack. Historical
 operational records, prior Git history and unmerged work are held in a private
 backup and must not be merged or pushed back into this repository. Continue new
 work from the current main branch; recreate older work as reviewed source changes.

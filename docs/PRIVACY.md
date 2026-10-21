@@ -1,6 +1,6 @@
 # Privacy checks
 
-This is the sole maintained repository: https://github.com/XingjianTian/QuantStack-Public.
+This is the sole maintained repository: https://github.com/XingjianTian/QuantStack.
 The previous private repository is archival recovery material. Never merge old
 branches or copy their `.git` directory into this repository.
 
