@@ -1,0 +1,150 @@
+name: quant-workspace-shadow-t111
+
+services:
+  postgres:
+    image: ${T111_POSTGRES_IMAGE:?set the inspected immutable PostgreSQL image}
+    pull_policy: never
+    environment:
+      POSTGRES_DB: ${T111_POSTGRES_DB:?set isolated database name}
+      POSTGRES_USER: ${T111_POSTGRES_USER:?set isolated database user}
+      POSTGRES_PASSWORD: ${T111_POSTGRES_PASSWORD:?set isolated database password}
+    volumes:
+      - ${T111_POSTGRES_ROOT:?set new isolated PostgreSQL root}:/var/lib/postgresql/data
+    group_add:
+      - ${T111_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    networks: [core]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    restart: "no"
+
+  redis:
+    image: ${T111_REDIS_IMAGE:?set the inspected immutable Redis image}
+    pull_policy: never
+    command: redis-server --appendonly yes
+    volumes:
+      - ${T111_REDIS_ROOT:?set new isolated Redis root}:/data
+    group_add:
+      - ${T111_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    networks: [core]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --raw INFO persistence | tr -d '\\r' | grep -q '^loading:0$'"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    restart: "no"
+
+  batch-api:
+    image: ${T111_QUANTSTACK_IMAGE:?set the inspected immutable QuantStack image}
+    pull_policy: never
+    environment:
+      QUANT_DATA_ROOT: /quant-data
+      QUANT_EXPERIMENT_ROOT: /tmp/experiments
+      QUANT_API_HOST: 0.0.0.0
+      QUANT_API_PORT: "8900"
+      QUANT_API_KEY: ${T111_QUANT_API_KEY:?set ephemeral Batch API key}
+      QUANT_BATCH_CONSUMER_ACCESS: ${T111_BATCH_CONSUMER_ACCESS:-shadow}
+      QUANT_BATCH_MAX_DATE_RANGE_DAYS: "3650"
+    volumes:
+      - ${T111_QUANT_DATA_ROOT:?set new isolated QuantStack root}:/quant-data:ro
+    group_add:
+      - ${T111_QUANT_DATA_READ_GID:?set the stable quant-data-read GID}
+      - ${T111_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [core]
+    ports:
+      - 127.0.0.1:29120:8900
+    mem_limit: 2g
+    cpus: 1.5
+    pids_limit: 256
+    restart: "no"
+
+  backend:
+    image: ${T111_BACKEND_IMAGE:?set the pinned Stock Screener backend image}
+    pull_policy: never
+    command: uvicorn quant_workspace_compat:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: postgresql://${T111_POSTGRES_USER}:${T111_POSTGRES_PASSWORD}@postgres:5432/${T111_POSTGRES_DB}
+      POSTGRES_DB: ${T111_POSTGRES_DB}
+      POSTGRES_USER: ${T111_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${T111_POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENABLED_MARKETS: CN
+      MARKET_DATA_SOURCE_MODE: github_first
+      WEB_CONCURRENCY: "1"
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "1"
+      SERVER_AUTH_ENABLED: "false"
+      SERVER_EXPOSE_API_DOCS: "false"
+      FEATURE_CHATBOT: "false"
+      FEATURE_THEMES: "false"
+      LLM_FALLBACK_ENABLED: "false"
+      SS_QUANTSTACK_READ_MODE: ${T111_SS_READ_MODE:-shadow}
+      SS_QUANTSTACK_PRIMARY_ENABLED: ${T111_SS_PRIMARY_ENABLED:-false}
+      SS_QUANTSTACK_SHADOW_ENABLED: ${T111_SS_SHADOW_ENABLED:-true}
+      SS_QUANTSTACK_SHADOW_SAMPLE_RATE: "1"
+      SS_QUANTSTACK_SHADOW_ALLOWLIST: ${T111_SHADOW_ALLOWLIST:?set frozen corpus allowlist}
+      SS_QUANTSTACK_BASE_URL: http://batch-api:8900
+      SS_QUANTSTACK_API_KEY: ${T111_QUANT_API_KEY}
+      SS_QUANTSTACK_BARS_DATASET_ID: cn_equity_daily
+      SS_QUANTSTACK_DATASET_VERSION: ${T111_DATASET_VERSION:-2015-2026.full-market-v1.ss-shadow-v1}
+      SS_QUANTSTACK_TIMEOUT_SECONDS: "15"
+      SS_QUANTSTACK_MAX_ATTEMPTS: "1"
+      SS_QUANTSTACK_SHADOW_MAX_WINDOW_DAYS: "3650"
+      SS_QUANTSTACK_CACHE_MAX_ENTRIES: "256"
+      SS_QUANTSTACK_SHADOW_QUEUE_SIZE: "32"
+      SS_QUANTSTACK_SHADOW_MAX_SYMBOLS_PER_TASK: "50"
+      SS_QUANTSTACK_SHADOW_MAX_LEGACY_ROWS_PER_TASK: "100000"
+      SS_QUANTSTACK_SHUTDOWN_TIMEOUT_SECONDS: "5"
+      SS_QUANTSTACK_SHADOW_REPORT_ROOT: /evidence/driver/shadow-reports
+      SS_RUNTIME_ENV: ${T111_SS_RUNTIME_ENV:-isolated-shadow}
+      SS_QUANTSTACK_ALLOW_CANDIDATE: "false"
+      SS_LEGACY_ADJUSTMENT_SEMANTICS: qfq
+      SS_LEGACY_VOLUME_UNIT: shares
+      T078_CONTROL_TOKEN: ${T111_CONTROL_TOKEN:?set ephemeral isolated control token}
+      T111_LEGACY_FIXTURE_REPLAY_ENABLED: "true"
+      T111_LEGACY_FIXTURE_MISSING_AS_EMPTY: "true"
+      T111_LEGACY_FIXTURE_ROOT: /fixtures/legacy_yfinance_cn_t110
+    volumes:
+      - ${T111_SS_DATA_ROOT:?set new isolated SS data root}:/app/data
+      - ${T111_EVIDENCE_ROOT:?set new isolated evidence root}/driver:/evidence/driver
+      - ../../tests/fixtures/stock_screener/legacy_yfinance_cn_t110:/fixtures/legacy_yfinance_cn_t110:ro
+      - ./quant_workspace_compat.py:/app/quant_workspace_compat.py:ro
+      - ./quantstack_consumer_adapter.py:/app/quantstack_consumer_adapter.py:ro
+      - ./legacy_fixture_replay.py:/app/legacy_fixture_replay.py:ro
+      - ./shadow_soak_driver.py:/opt/t078/shadow_soak_driver.py:ro
+      - ./shadow-corpus-t133.json:/opt/t078/shadow-corpus-t133.json:ro
+      - ./shadow-corpus-t134-qfq.json:/opt/t078/shadow-corpus-t134-qfq.json:ro
+    group_add:
+      - ${T111_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      batch-api: {condition: service_healthy}
+    networks: [core]
+    ports:
+      - 127.0.0.1:29110:8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 120s
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+    restart: "no"
+
+networks:
+  core:
+    internal: true

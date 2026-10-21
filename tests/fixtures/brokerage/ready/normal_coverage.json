@@ -1,0 +1,18 @@
+{
+  "fictional": true,
+  "profile": "ready",
+  "accountId": "fictional-account",
+  "accountHash": "fictional-account-hash",
+  "reservationSemantics": "cashAvailableForTrading_includes_open_order_reservation",
+  "complete": true,
+  "truncated": false,
+  "sourceAsOf": "2026-10-16T00:00:00+00:00",
+  "sections": [
+    "account",
+    "positions",
+    "orders",
+    "transactions",
+    "fills",
+    "quotes"
+  ]
+}

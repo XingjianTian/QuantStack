@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/fundamental/1.0.0",
+  "title": "QuantStack Point-in-time Fundamental",
+  "type": "object", "additionalProperties": false,
+  "required": ["instrument_id", "market", "period_end", "filed_at", "available_at", "metric", "value", "currency"],
+  "properties": {
+    "instrument_id": {"type": "string"}, "market": {"enum": ["CN", "HK", "US"]},
+    "period_end": {"type": "string", "format": "date"}, "filed_at": {"type": "string", "format": "date-time"},
+    "available_at": {"type": "string", "format": "date-time"}, "metric": {"type": "string"},
+    "value": {"type": ["number", "null"]}, "unit": {"type": ["string", "null"]},
+    "currency": {"enum": ["CNY", "HKD", "USD"]}, "source_revision": {"type": ["string", "null"]}
+  }
+}

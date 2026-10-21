@@ -1,0 +1,270 @@
+diff --git a/frontend/src/api/priceHistory.js b/frontend/src/api/priceHistory.js
+index f37ad016..49e8ff9d 100644
+--- a/frontend/src/api/priceHistory.js
++++ b/frontend/src/api/priceHistory.js
+@@ -17,6 +17,13 @@ export const fetchPriceHistory = async (symbol, period = '6mo') => {
+   return response.data;
+ };
+ 
++export const fetchPriceHistoryRange = async (symbol, start, end) => {
++  const response = await apiClient.get(`/v1/stocks/${symbol}/history`, {
++    params: { start, end },
++  });
++  return response.data;
++};
++
+ /**
+  * Fetch the RS line (stock / market benchmark) and blue-dot dates for a symbol.
+  * @param {string} symbol - Stock symbol
+@@ -48,6 +55,7 @@ export const fetchPriceHistoryBatch = async (symbols, period = '6mo') => {
+ export const priceHistoryKeys = {
+   all: ['priceHistory'],
+   symbol: (symbol, period = '6mo') => ['priceHistory', symbol, period],
++  range: (symbol, start, end) => ['priceHistory', symbol, 'range', start, end],
+   rsLine: (symbol, period = '6mo') => ['priceHistory', 'rsLine', symbol, period],
+   batch: (symbols, period = '6mo') => [
+     'priceHistory',
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index ab2bba51..8fefca5a 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -2,7 +2,7 @@ import { useRef, useEffect, useLayoutEffect, useState, useMemo } from 'react';
+ import { Box, CircularProgress, Alert, AlertTitle, Button, ToggleButtonGroup, ToggleButton, useTheme, Typography } from '@mui/material';
+ import { createPriceChartSeries } from './createPriceChartSeries';
+ import { useQuery, useQueryClient } from '@tanstack/react-query';
+-import { fetchPriceHistory, fetchRSLine, priceHistoryKeys, PRICE_HISTORY_STALE_TIME } from '../../api/priceHistory';
++import { fetchPriceHistory, fetchPriceHistoryRange, fetchRSLine, priceHistoryKeys, PRICE_HISTORY_STALE_TIME } from '../../api/priceHistory';
+ import { rsBandForRange } from './rsBand';
+ import ChartSkeleton from './ChartSkeleton';
+ import { transformToCandlestickData } from './candlestickData';
+@@ -13,6 +13,8 @@ import {
+   clearRsOverlayForTimeframe,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
++  mergePriceHistory,
++  missingDailyHistoryRange,
+   nextDailyHistoryPeriod,
+   pannedLogicalRange,
+   usesBundledPriceData,
+@@ -79,10 +81,12 @@ function CandlestickChart({
+   const latestCandleRef = useRef(null); // Store latest candle for default display
+   const previousTimeframeRef = useRef('daily');
+   const fitTimeframeWhenSettledRef = useRef(false);
++  const historyExpansionPendingRef = useRef(false);
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(true); // RS line overlay toggle
+   const [dailyHistoryPeriod, setDailyHistoryPeriod] = useState(period);
++  const [olderDailyData, setOlderDailyData] = useState([]);
+   const [legendData, setLegendData] = useState(null); // OHLC legend data on hover
+   const [rsBandTop, setRsBandTop] = useState(0.66); // top margin of the live RS band
+   const theme = useTheme();
+@@ -91,13 +95,13 @@ function CandlestickChart({
+   const queryClient = useQueryClient();
+   const effectiveTimeframe = hideTimeframeToggle ? 'daily' : timeframe;
+   const historyPeriod = effectiveTimeframe === 'daily'
+-    ? dailyHistoryPeriod
++    ? period
+     : historyPeriodForTimeframe(effectiveTimeframe, period);
+-  const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData)
+-    && !(effectiveTimeframe === 'daily' && dailyHistoryPeriod !== period);
++  const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData);
+ 
+   useEffect(() => {
+     setDailyHistoryPeriod(period);
++    setOlderDailyData([]);
+   }, [period, symbol]);
+ 
+   // Get any existing cached data for this symbol to use as placeholder
+@@ -126,14 +130,20 @@ function CandlestickChart({
+     },
+   });
+ 
+-  const apiData = useBundledPriceData ? priceData : fetchedApiData;
++  const baseApiData = useBundledPriceData ? priceData : fetchedApiData;
++  const apiData = useMemo(() => (
++    effectiveTimeframe === 'daily'
++      ? mergePriceHistory(olderDailyData, baseApiData || [])
++      : baseApiData
++  ), [baseApiData, effectiveTimeframe, olderDailyData]);
++  const priceRequestSettled = useBundledPriceData || (!isFetching && dataUpdatedAt > 0);
+ 
+   // Live RS line + blue-dot dates (interactive surfaces only). Static charts
+   // carry the RS payload in their bundle instead, so the query stays disabled.
+   const { data: fetchedRsData } = useQuery({
+     queryKey: priceHistoryKeys.rsLine(symbol, historyPeriod),
+     queryFn: () => fetchRSLine(symbol, historyPeriod),
+-    enabled: !!symbol && !priceData && !compact && showRSLine && !isFetching
++    enabled: !!symbol && !priceData && !compact && showRSLine && priceRequestSettled
+       && Array.isArray(apiData) && apiData.length > 0,
+     staleTime: PRICE_HISTORY_STALE_TIME,
+     keepPreviousData: true,
+@@ -192,10 +202,10 @@ function CandlestickChart({
+   }, [apiData, effectiveTimeframe]);
+ 
+   useEffect(() => {
+-    if (Array.isArray(apiData) && apiData.length > 0 && onDataReady) {
++    if (priceRequestSettled && Array.isArray(apiData) && apiData.length > 0 && onDataReady) {
+       onDataReady(symbol);
+     }
+-  }, [apiData, onDataReady, symbol]);
++  }, [apiData, onDataReady, priceRequestSettled, symbol]);
+ 
+   // Initialize chart on mount using useLayoutEffect for synchronous DOM access
+   useLayoutEffect(() => {
+@@ -345,9 +355,22 @@ function CandlestickChart({
+       if (!next) {
+         if (intent === 'pan' && wheelDelta < 0 && effectiveTimeframe === 'daily') {
+           const expandedPeriod = nextDailyHistoryPeriod(dailyHistoryPeriod);
+-          if (expandedPeriod !== dailyHistoryPeriod) {
+-            shouldRestoreRangeRef.current = true;
+-            setDailyHistoryPeriod(expandedPeriod);
++          if (expandedPeriod !== dailyHistoryPeriod && !historyExpansionPendingRef.current) {
++            const earliest = apiData?.[0]?.time ?? apiData?.[0]?.date;
++            const range = missingDailyHistoryRange(expandedPeriod, earliest);
++            if (range) {
++              historyExpansionPendingRef.current = true;
++              queryClient.fetchQuery({
++                queryKey: priceHistoryKeys.range(symbol, range.start, range.end),
++                queryFn: () => fetchPriceHistoryRange(symbol, range.start, range.end),
++                staleTime: PRICE_HISTORY_STALE_TIME,
++              }).then((points) => {
++                setOlderDailyData((current) => mergePriceHistory(current, points || []));
++                setDailyHistoryPeriod(expandedPeriod);
++              }).finally(() => {
++                historyExpansionPendingRef.current = false;
++              });
++            }
+           }
+         }
+         return;
+@@ -363,6 +386,9 @@ function CandlestickChart({
+     dailyHistoryPeriod,
+     effectiveTimeframe,
+     interactive,
++    apiData,
++    queryClient,
++    symbol,
+   ]);
+ 
+   // Subscribe to visible time range changes
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index 4409624f..60db4dd9 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -20,6 +20,34 @@ export const nextDailyHistoryPeriod = (period) => {
+   return DAILY_HISTORY_PERIODS[Math.min(index + 1, DAILY_HISTORY_PERIODS.length - 1)];
+ };
+ 
++const DAILY_PERIOD_YEARS = { '2y': 2, '5y': 5, '10y': 10 };
++
++export const missingDailyHistoryRange = (period, earliestDate) => {
++  const years = DAILY_PERIOD_YEARS[period];
++  if (!years || !earliestDate) return null;
++  const earliest = new Date(`${earliestDate}T00:00:00Z`);
++  if (Number.isNaN(earliest.getTime())) return null;
++  const end = new Date(earliest);
++  end.setUTCDate(end.getUTCDate() - 1);
++  const start = new Date();
++  start.setUTCHours(0, 0, 0, 0);
++  start.setUTCFullYear(start.getUTCFullYear() - years);
++  const format = (value) => value.toISOString().slice(0, 10);
++  if (start > end) return null;
++  return { start: format(start), end: format(end) };
++};
++
++export const mergePriceHistory = (...segments) => {
++  const byDate = new Map();
++  segments.flat().forEach((point) => {
++    const key = point?.time ?? point?.date;
++    if (key) byDate.set(String(key), point);
++  });
++  return [...byDate.entries()]
++    .sort(([left], [right]) => left.localeCompare(right))
++    .map(([, point]) => point);
++};
++
+ export const isDailyTimeframe = (timeframe) => timeframe === 'daily';
+ 
+ export const usesBundledPriceData = (timeframe, priceData) => (
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index f0ecff16..25374f7e 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -6,6 +6,8 @@ import {
+   historyPeriodForTimeframe,
+   nextDailyHistoryPeriod,
+   isDailyTimeframe,
++  mergePriceHistory,
++  missingDailyHistoryRange,
+   pannedLogicalRange,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+@@ -38,6 +40,20 @@ describe('chart timeframe controls', () => {
+     expect(nextDailyHistoryPeriod('10y')).toBe('10y');
+   });
+ 
++  it('requests only the missing older segment and merges it without duplicates', () => {
++    const range = missingDailyHistoryRange('2y', '2026-03-01');
++    expect(range?.end).toBe('2026-02-28');
++    expect(range?.start < range?.end).toBe(true);
++    expect(mergePriceHistory(
++      [{ date: '2026-02-27', close: 8 }, { date: '2026-03-01', close: 9 }],
++      [{ date: '2026-03-01', close: 10 }, { date: '2026-03-02', close: 11 }],
++    )).toEqual([
++      { date: '2026-02-27', close: 8 },
++      { date: '2026-03-01', close: 10 },
++      { date: '2026-03-02', close: 11 },
++    ]);
++  });
++
+   it('keeps the RS overlay on the full daily view only', () => {
+     expect(isDailyTimeframe('five-day')).toBe(false);
+     expect(isDailyTimeframe('daily')).toBe(true);
+diff --git a/frontend/src/pages/MarketScanPage.jsx b/frontend/src/pages/MarketScanPage.jsx
+index b3a346ba..e4fc542d 100644
+--- a/frontend/src/pages/MarketScanPage.jsx
++++ b/frontend/src/pages/MarketScanPage.jsx
+@@ -55,6 +55,12 @@ function MarketScanPage() {
+     setSelectedTab(0);
+   }, [selectedMarket]);
+ 
++  useEffect(() => {
++    const showDailyHome = () => setSelectedTab(0);
++    window.addEventListener('quant:ss-home', showDailyHome);
++    return () => window.removeEventListener('quant:ss-home', showDailyHome);
++  }, []);
++
+   return (
+     <Box sx={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
+       {/* Left sidebar with vertical tabs */}
+diff --git a/frontend/src/pages/MarketScanPage.test.jsx b/frontend/src/pages/MarketScanPage.test.jsx
+index 834b5ca3..c0948b23 100644
+--- a/frontend/src/pages/MarketScanPage.test.jsx
++++ b/frontend/src/pages/MarketScanPage.test.jsx
+@@ -1,5 +1,5 @@
+ import { createTheme, ThemeProvider } from '@mui/material';
+-import { fireEvent, render, screen } from '@testing-library/react';
++import { act, fireEvent, render, screen } from '@testing-library/react';
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ import MarketScanPage from './MarketScanPage';
+@@ -103,4 +103,18 @@ describe('MarketScanPage capability gating', () => {
+     expect(await screen.findByText('daily-snapshot-tab')).toBeInTheDocument();
+     expect(screen.getByRole('tab', { name: 'Daily Snapshot' })).toHaveAttribute('aria-selected', 'true');
+   });
++
++  it('returns to Daily Snapshot when the shared SS nav is clicked', async () => {
++    render(
++      <ThemeProvider theme={createTheme()}>
++        <MarketScanPage />
++      </ThemeProvider>
++    );
++    fireEvent.click(screen.getByRole('tab', { name: 'Watchlists' }));
++    expect(await screen.findByText('watchlists-tab')).toBeInTheDocument();
++
++    act(() => window.dispatchEvent(new CustomEvent('quant:ss-home')));
++
++    expect(await screen.findByText('daily-snapshot-tab')).toBeInTheDocument();
++  });
+ });

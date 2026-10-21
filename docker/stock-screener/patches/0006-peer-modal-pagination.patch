@@ -1,0 +1,106 @@
+diff --git a/frontend/src/components/Scan/PeerComparisonModal.jsx b/frontend/src/components/Scan/PeerComparisonModal.jsx
+index e3249734..af6f51f9 100644
+--- a/frontend/src/components/Scan/PeerComparisonModal.jsx
++++ b/frontend/src/components/Scan/PeerComparisonModal.jsx
+@@ -12,6 +12,7 @@ import {
+   TableHead,
+   TableRow,
+   TableSortLabel,
++  TablePagination,
+   Paper,
+   Typography,
+   Box,
+@@ -29,6 +30,7 @@ import RSSparkline from './RSSparkline';
+ import AddToWatchlistMenu from '../common/AddToWatchlistMenu';
+ import { getStageColor } from '../../utils/colorUtils';
+ import { formatLocalCurrency } from '../../utils/formatUtils';
++import { paginatePeerRows } from './peerRows';
+ 
+ /**
+  * Fetch peer stocks — scan-based when scanId is provided, standalone otherwise.
+@@ -56,9 +58,12 @@ function PeerComparisonModal({ open, onClose, scanId, symbol, onOpenChart }) {
+ 
+   const [sortBy, setSortBy] = useState('composite_score');
+   const [sortOrder, setSortOrder] = useState('desc');
++  const [page, setPage] = useState(0);
++  const [rowsPerPage, setRowsPerPage] = useState(50);
+ 
+   const handleRequestSort = (property) => {
+     const isAsc = sortBy === property && sortOrder === 'asc';
++    setPage(0);
+     setSortOrder(isAsc ? 'desc' : 'asc');
+     setSortBy(property);
+   };
+@@ -86,6 +91,10 @@ function PeerComparisonModal({ open, onClose, scanId, symbol, onOpenChart }) {
+     });
+   }, [peers, sortBy, sortOrder]);
+ 
++  const pageCount = Math.max(1, Math.ceil(sortedPeers.length / rowsPerPage));
++  const safePage = Math.min(page, pageCount - 1);
++  const visiblePeers = paginatePeerRows(sortedPeers, safePage, rowsPerPage);
++
+   const industryGroup = peers && peers.length > 0 ? peers[0].ibd_industry_group : '';
+ 
+   return (
+@@ -234,7 +243,7 @@ function PeerComparisonModal({ open, onClose, scanId, symbol, onOpenChart }) {
+                   </TableRow>
+                 </TableHead>
+                 <TableBody>
+-                  {sortedPeers.map((peer) => (
++                  {visiblePeers.map((peer) => (
+                     <TableRow
+                       key={peer.symbol}
+                       sx={{
+@@ -362,6 +371,18 @@ function PeerComparisonModal({ open, onClose, scanId, symbol, onOpenChart }) {
+                 </TableBody>
+               </Table>
+             </TableContainer>
++            <TablePagination
++              component="div"
++              count={sortedPeers.length}
++              page={safePage}
++              onPageChange={(_event, nextPage) => setPage(nextPage)}
++              rowsPerPage={rowsPerPage}
++              onRowsPerPageChange={(event) => {
++                setRowsPerPage(Number(event.target.value));
++                setPage(0);
++              }}
++              rowsPerPageOptions={[25, 50, 100]}
++            />
+           </>
+         )}
+ 
+diff --git a/frontend/src/components/Scan/peerRows.js b/frontend/src/components/Scan/peerRows.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/Scan/peerRows.js
+@@ -0,0 +1,6 @@
++export const paginatePeerRows = (rows, page, rowsPerPage) => {
++  if (!Array.isArray(rows) || rowsPerPage <= 0) return [];
++  const safePage = Math.max(0, Number.isFinite(page) ? page : 0);
++  const start = safePage * rowsPerPage;
++  return rows.slice(start, start + rowsPerPage);
++};
+diff --git a/frontend/src/components/Scan/peerRows.test.js b/frontend/src/components/Scan/peerRows.test.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/Scan/peerRows.test.js
+@@ -0,0 +1,18 @@
++import { describe, expect, it } from 'vitest';
++
++import { paginatePeerRows } from './peerRows';
++
++describe('paginatePeerRows', () => {
++  const rows = Array.from({ length: 462 }, (_, index) => ({ symbol: `S${index}` }));
++
++  it('renders only the requested peer page', () => {
++    expect(paginatePeerRows(rows, 0, 50)).toHaveLength(50);
++    expect(paginatePeerRows(rows, 1, 50)[0].symbol).toBe('S50');
++    expect(paginatePeerRows(rows, 9, 50)).toHaveLength(12);
++  });
++
++  it('returns an empty page for invalid input', () => {
++    expect(paginatePeerRows(null, 0, 50)).toEqual([]);
++    expect(paginatePeerRows(rows, 0, 0)).toEqual([]);
++  });
++});

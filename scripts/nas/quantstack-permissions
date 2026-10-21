@@ -1,0 +1,333 @@
+#!/bin/sh
+set -eu
+
+read_group="quant-data-read"
+shadow_group="quant-shadow-write"
+installed_path="/usr/local/sbin/quantstack-permissions"
+config_path="/etc/quantstack-permissions.conf"
+sudoers_path="/etc/sudoers.d/quantstack-permissions"
+snapshot_root="/var/lib/quantstack-permissions/acl-snapshots"
+
+fail() {
+    echo "quantstack-permissions: $*" >&2
+    exit 1
+}
+
+require_root() {
+    [ "$(id -u)" -eq 0 ] || fail "this action must run as root"
+}
+
+load_config() {
+    [ -f "$config_path" ] || fail "configuration is not installed"
+    [ "$(stat -c %u "$config_path")" -eq 0 ] || fail "configuration must be root-owned"
+    [ "$(stat -c %a "$config_path")" = 644 ] || fail "configuration mode must be 0644"
+    # The file is installed by root after strict character validation and is not writable
+    # through any NOPASSWD action.
+    . "$config_path"
+    [ -n "${operator_user:-}" ] || fail "configuration has no operator_user"
+    [ -n "${data_root:-}" ] || fail "configuration has no data_root"
+    shadow_root="$data_root/shadow-runs"
+}
+
+ensure_group() {
+    group_name=$1
+    getent group "$group_name" >/dev/null 2>&1 || groupadd --system "$group_name"
+}
+
+read_gid() {
+    getent group "$read_group" | cut -d: -f3
+}
+
+shadow_gid() {
+    getent group "$shadow_group" | cut -d: -f3
+}
+
+require_acl_tools() {
+    command -v setfacl >/dev/null 2>&1 || fail "setfacl is required"
+    command -v getfacl >/dev/null 2>&1 || fail "getfacl is required"
+    command -v setpriv >/dev/null 2>&1 || fail "setpriv is required"
+}
+
+migrate_read_tree_groups() {
+    for tree in \
+        "$data_root/canonical" \
+        "$data_root/catalog" \
+        "$data_root/staging/proposed_manifests"
+    do
+        [ -e "$tree" ] || continue
+        chgrp -R "$read_group" "$tree"
+    done
+}
+
+repair_read_tree() {
+    require_root
+    getent group "$read_group" >/dev/null 2>&1 || fail "$read_group does not exist"
+    require_acl_tools
+    expected_gid=$(read_gid)
+    for tree in \
+        "$data_root/canonical" \
+        "$data_root/catalog" \
+        "$data_root/staging/proposed_manifests"
+    do
+        [ -e "$tree" ] || continue
+        mismatched_path=$(find "$tree" ! -gid "$expected_gid" -print -quit)
+        [ -z "$mismatched_path" ] || fail "read tree contains an unexpected gid: $mismatched_path"
+
+        # With an extended POSIX ACL, chmod changes the ACL mask but can leave a
+        # contradictory owning-group entry untouched.  Set the owning-group
+        # entry explicitly while preserving owner and named ACL entries.
+        find "$tree" -type f -exec setfacl -m 'g::r--,m::r--,o::---' -- {} +
+        find "$tree" -type d -exec setfacl -m 'g::r-x,m::r-x,o::---' -- {} +
+        find "$tree" -type d -exec chmod g+s -- {} +
+        find "$tree" -type d -exec setfacl -d -m 'g::r-x,m::r-x,o::---' -- {} +
+    done
+}
+
+validate_version() {
+    version=$1
+    case "$version" in
+        ""|*[!A-Za-z0-9._-]*) fail "version contains unsupported characters" ;;
+    esac
+}
+
+repair_cn_equity_version() {
+    require_root
+    [ "$#" -eq 1 ] || fail "repair-cn-equity-version requires one version"
+    validate_version "$1"
+    getent group "$read_group" >/dev/null 2>&1 || fail "$read_group does not exist"
+    getent group "$shadow_group" >/dev/null 2>&1 || fail "$shadow_group does not exist"
+    require_acl_tools
+
+    version=$1
+    tree="$data_root/canonical/cn_equity_daily/version=$version"
+    [ -d "$tree" ] || fail "cn_equity_daily version does not exist"
+    [ ! -L "$tree" ] || fail "cn_equity_daily version must not be a symlink"
+    [ "$(readlink -f "$tree")" = "$tree" ] || fail "cn_equity_daily version path is not canonical"
+    bars="$tree/bars.parquet"
+    [ -f "$bars" ] && [ ! -L "$bars" ] || fail "bars.parquet must be a regular non-symlink file"
+
+    expected_gid=$(read_gid)
+    mismatched_path=$(find "$tree" -xdev ! -gid "$expected_gid" -print -quit)
+    [ -z "$mismatched_path" ] || fail "read tree contains an unexpected gid: $mismatched_path"
+
+    install -d -o root -g root -m 0700 "$snapshot_root"
+    snapshot="$snapshot_root/cn_equity_daily-version=$version-$(date -u +%Y%m%dT%H%M%SZ)-$$.acl"
+    temporary_snapshot=$(mktemp)
+    getfacl -R -p "$tree" >"$temporary_snapshot"
+    install -o root -g root -m 0600 "$temporary_snapshot" "$snapshot"
+    rm -f "$temporary_snapshot"
+
+    restore_needed=1
+    rollback_on_exit() {
+        status=$?
+        trap - EXIT HUP INT TERM
+        if [ "$restore_needed" -eq 1 ]; then
+            setfacl --restore="$snapshot" || status=1
+        fi
+        exit "$status"
+    }
+    trap rollback_on_exit EXIT HUP INT TERM
+
+    # One-file canary first, using the same uid/gid set as the S0 container.
+    setfacl -m 'g::r--,m::r--,o::---' -- "$bars"
+    setpriv --reuid 1000 --regid 1000 --groups "$(shadow_gid),$expected_gid,1000" \
+        test -r "$bars"
+
+    find "$tree" -xdev -type f -exec setfacl -m 'g::r--,m::r--,o::---' -- {} +
+    find "$tree" -xdev -type d -exec setfacl -m 'g::r-x,m::r-x,o::---' -- {} +
+    find "$tree" -xdev -type d -exec chmod g+s -- {} +
+    find "$tree" -xdev -type d -exec setfacl -d -m 'g::r-x,m::r-x,o::---' -- {} +
+    setpriv --reuid 1000 --regid 1000 --groups "$(shadow_gid),$expected_gid,1000" \
+        sh -c 'bad=$(find "$1" -xdev -type f ! -readable -print -quit); [ -z "$bad" ]' sh "$tree"
+
+    restore_needed=0
+    trap - EXIT HUP INT TERM
+    echo "repaired cn_equity_daily version=$version acl_snapshot=$snapshot"
+}
+
+validate_task_id() {
+    task_id=$1
+    case "$task_id" in
+        t[0-9][0-9][0-9]) ;;
+        *) fail "task id must match tNNN" ;;
+    esac
+}
+
+provision_shadow() {
+    require_root
+    task_id=$1
+    validate_task_id "$task_id"
+    getent group "$shadow_group" >/dev/null 2>&1 || fail "$shadow_group does not exist"
+    task_root="$shadow_root/$task_id"
+    install -d -o root -g root -m 0755 "$shadow_root"
+    install -d -o root -g "$shadow_group" -m 2750 "$task_root"
+    install -d -o "$operator_user" -g "$shadow_group" -m 2770 \
+        "$task_root/quant-data" \
+        "$task_root/postgres" \
+        "$task_root/redis" \
+        "$task_root/ss-data"
+    install -d -o root -g "$shadow_group" -m 2750 "$task_root/evidence"
+    install -d -o "$operator_user" -g "$shadow_group" -m 2770 \
+        "$task_root/evidence/proxy" \
+        "$task_root/evidence/driver"
+    echo "$task_root"
+}
+
+require_real_directory() {
+    path=$1
+    description=$2
+    [ -d "$path" ] || fail "$description does not exist"
+    [ ! -L "$path" ] || fail "$description must not be a symlink"
+    [ "$(readlink -f "$path")" = "$path" ] || fail "$description path is not canonical"
+}
+
+require_shadow_task_parent() {
+    task_root=$1
+    description=$2
+    expected_shadow_gid=$3
+    require_real_directory "$task_root" "$description"
+    [ "$(stat -c %u "$task_root")" -eq 0 ] || fail "$description must be root-owned"
+    [ "$(stat -c %g "$task_root")" -eq "$expected_shadow_gid" ] || fail "$description has an unexpected gid"
+    [ "$(stat -c %a "$task_root")" = 2750 ] || fail "$description mode must be 2750"
+}
+
+prepare_shadow_projection() {
+    require_root
+    [ "$#" -eq 2 ] || fail "prepare-shadow-projection requires source and target task ids"
+    source_task=$1
+    target_task=$2
+    validate_task_id "$source_task"
+    validate_task_id "$target_task"
+    [ "$source_task" != "$target_task" ] || fail "source and target task ids must differ"
+    getent group "$shadow_group" >/dev/null 2>&1 || fail "$shadow_group does not exist"
+    id "$operator_user" >/dev/null 2>&1 || fail "operator user does not exist"
+
+    expected_shadow_gid=$(shadow_gid)
+    expected_operator_uid=$(id -u "$operator_user")
+    require_real_directory "$shadow_root" "shadow root"
+
+    source_task_root="$shadow_root/$source_task"
+    target_task_root="$shadow_root/$target_task"
+    source_quant_data="$source_task_root/quant-data"
+    target_quant_data="$target_task_root/quant-data"
+    staged_quant_data="$target_task_root/.quant-data.prepare"
+
+    require_shadow_task_parent "$source_task_root" "source task parent" "$expected_shadow_gid"
+    require_shadow_task_parent "$target_task_root" "target task parent" "$expected_shadow_gid"
+    require_real_directory "$source_quant_data" "source quant-data"
+    require_real_directory "$target_quant_data" "target quant-data"
+    [ "$(stat -c %u "$target_quant_data")" -eq "$expected_operator_uid" ] || fail "target quant-data has an unexpected uid"
+    [ "$(stat -c %g "$target_quant_data")" -eq "$expected_shadow_gid" ] || fail "target quant-data has an unexpected gid"
+    [ "$(stat -c %a "$target_quant_data")" = 2770 ] || fail "target quant-data mode must be 2770"
+    target_child=$(find "$target_quant_data" -mindepth 1 -maxdepth 1 -print -quit)
+    [ -z "$target_child" ] || fail "target quant-data must be empty"
+    [ ! -e "$staged_quant_data" ] && [ ! -L "$staged_quant_data" ] || fail "projection staging path already exists"
+
+    stage_started=0
+    target_removed=0
+    rollback_projection() {
+        status=$?
+        trap - EXIT HUP INT TERM
+        if [ "$target_removed" -eq 1 ] && [ ! -e "$target_quant_data" ]; then
+            install -d -o "$operator_user" -g "$shadow_group" -m 2770 "$target_quant_data" || status=1
+        fi
+        if [ "$stage_started" -eq 1 ] && [ -e "$staged_quant_data" ]; then
+            rm -rf -- "$staged_quant_data" || status=1
+        fi
+        exit "$status"
+    }
+    trap rollback_projection EXIT HUP INT TERM
+
+    stage_started=1
+    cp -a --reflink=always -- "$source_quant_data" "$staged_quant_data"
+    require_real_directory "$staged_quant_data" "staged quant-data"
+    target_removed=1
+    rmdir "$target_quant_data"
+    mv -- "$staged_quant_data" "$target_quant_data"
+
+    target_removed=0
+    stage_started=0
+    trap - EXIT HUP INT TERM
+    echo "$target_quant_data"
+}
+
+install_model() {
+    require_root
+    [ "$#" -eq 1 ] || fail "install requires one absolute data root"
+    operator_user=${SUDO_USER:-}
+    [ -n "$operator_user" ] && [ "$operator_user" != root ] || fail "install must run through sudo"
+    case "$operator_user" in *[!A-Za-z0-9_-]*) fail "unsupported operator name" ;; esac
+    case "$1" in /*) ;; *) fail "data root must be absolute" ;; esac
+    case "$1" in *[!A-Za-z0-9_./-]*) fail "unsupported data-root characters" ;; esac
+    data_root=$(readlink -f "$1")
+    shadow_root="$data_root/shadow-runs"
+    # Numeric NAS login names are valid, but `getent passwd NAME` interprets a
+    # digits-only key as a UID. `id` resolves the login name correctly through NSS.
+    id "$operator_user" >/dev/null 2>&1 || fail "operator user does not exist"
+    [ -d "$data_root" ] || fail "data root does not exist"
+    ensure_group "$read_group"
+    ensure_group "$shadow_group"
+    usermod -a -G "$read_group,$shadow_group" "$operator_user"
+    install -o root -g root -m 0755 "$0" "$installed_path"
+    temporary_config=$(mktemp)
+    temporary_sudoers=$(mktemp)
+    trap 'rm -f "$temporary_config" "$temporary_sudoers"' EXIT HUP INT TERM
+    {
+        echo "operator_user='$operator_user'"
+        echo "data_root='$data_root'"
+    } >"$temporary_config"
+    install -o root -g root -m 0644 "$temporary_config" "$config_path"
+    {
+        echo "$operator_user ALL=(root) NOPASSWD: $installed_path status"
+        echo "$operator_user ALL=(root) NOPASSWD: $installed_path repair-read"
+        echo "$operator_user ALL=(root) NOPASSWD: $installed_path repair-cn-equity-version *"
+        echo "$operator_user ALL=(root) NOPASSWD: $installed_path provision-shadow *"
+        echo "$operator_user ALL=(root) NOPASSWD: $installed_path prepare-shadow-projection *"
+    } >"$temporary_sudoers"
+    chmod 0440 "$temporary_sudoers"
+    visudo -cf "$temporary_sudoers" >/dev/null
+    install -o root -g root -m 0440 "$temporary_sudoers" "$sudoers_path"
+    echo "installed read_gid=$(read_gid) shadow_gid=$(shadow_gid)"
+    echo "start a new SSH login before relying on supplementary groups"
+}
+
+status() {
+    getent group "$read_group" || true
+    getent group "$shadow_group" || true
+    id "$operator_user"
+    printf 'data_root=%s\n' "$data_root"
+    printf 'shadow_root=%s\n' "$shadow_root"
+    [ ! -e "$sudoers_path" ] || ls -ld "$sudoers_path"
+}
+
+command=${1:-}
+case "$command" in
+    install)
+        shift
+        install_model "$@"
+        ;;
+    status)
+        load_config
+        status
+        ;;
+    repair-read)
+        load_config
+        repair_read_tree
+        ;;
+    repair-cn-equity-version)
+        [ "$#" -eq 2 ] || fail "usage: $0 repair-cn-equity-version VERSION"
+        load_config
+        repair_cn_equity_version "$2"
+        ;;
+    provision-shadow)
+        [ "$#" -eq 2 ] || fail "usage: $0 provision-shadow tNNN"
+        load_config
+        provision_shadow "$2"
+        ;;
+    prepare-shadow-projection)
+        [ "$#" -eq 3 ] || fail "usage: $0 prepare-shadow-projection SOURCE_TNNN TARGET_TNNN"
+        load_config
+        prepare_shadow_projection "$2" "$3"
+        ;;
+    *) fail "usage: $0 {install DATA_ROOT|status|repair-read|repair-cn-equity-version VERSION|provision-shadow tNNN|prepare-shadow-projection SOURCE_TNNN TARGET_TNNN}" ;;
+esac

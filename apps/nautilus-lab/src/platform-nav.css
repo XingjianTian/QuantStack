@@ -1,0 +1,128 @@
+:root {
+  --platform-nav-offset: 64px;
+}
+
+.platform-nav {
+  height: 52px;
+  top: 6px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 10px;
+  padding: 0 10px 0 18px;
+  border: 2px solid;
+  border-radius: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  transition: background-color .18s, border-color .18s, color .18s, box-shadow .18s;
+}
+
+.platform-nav strong {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 21px;
+  white-space: nowrap;
+}
+
+.platform-nav-links {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.platform-nav-links::-webkit-scrollbar { display: none; }
+
+.platform-nav a {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  color: inherit;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  white-space: nowrap;
+}
+
+.platform-nav[data-surface="dark"] {
+  color: #171a19;
+  border-color: #168cff;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(22, 140, 255, .2), 0 8px 28px rgba(22, 140, 255, .24);
+}
+
+.platform-nav[data-surface="dark"] a { color: #3c4541; }
+.platform-nav[data-surface="dark"] a:hover { color: #050606; background: #eaf4ff; }
+.platform-nav[data-surface="dark"] a[aria-current="page"] { color: #fff; background: #101312; box-shadow: inset 0 0 0 1px rgba(22, 140, 255, .65); }
+
+.platform-nav[data-surface="light"] {
+  color: #f4f7f5;
+  border-color: #35f27c;
+  background: #090b0a;
+  box-shadow: 0 0 0 1px rgba(53, 242, 124, .2), 0 8px 28px rgba(53, 242, 124, .22);
+}
+
+.platform-nav[data-surface="light"] a { color: #c7cfcb; }
+.platform-nav[data-surface="light"] a:hover { color: #fff; background: #17251c; }
+.platform-nav[data-surface="light"] a[aria-current="page"] { color: #080a09; background: #fff; box-shadow: inset 0 0 0 1px rgba(53, 242, 124, .75); }
+
+.platform-theme-toggle {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  opacity: .82;
+  transition: opacity .16s, transform .16s, background .16s;
+}
+
+.platform-theme-toggle:hover { opacity: 1; transform: translateY(-1px); }
+.platform-nav[data-surface="dark"] .platform-theme-toggle:hover { background: #eaf4ff; }
+.platform-nav[data-surface="light"] .platform-theme-toggle:hover { background: #17251c; }
+
+html[data-theme="light"] body {
+  color: #17201c;
+  background: radial-gradient(circle at 78% -10%, rgba(14, 165, 233, .08), transparent 34%), #f4f7f5;
+}
+html[data-theme="light"] .hero { border-color: #d6dfdb; }
+html[data-theme="light"] .hero p,
+html[data-theme="light"] .panel-head span,
+html[data-theme="light"] .table-panel header span,
+html[data-theme="light"] .table-panel td,
+html[data-theme="light"] .pipeline-step p { color: #65736d; }
+html[data-theme="light"] .secondary { color: #26332d; border-color: #cbd5d0; background: #fff; }
+html[data-theme="light"] .loading,
+html[data-theme="light"] .status-strip,
+html[data-theme="light"] .panel,
+html[data-theme="light"] .table-panel { color: #17201c; border-color: #d6dfdb; background: #fff; }
+html[data-theme="light"] .status-strip > div,
+html[data-theme="light"] .pipeline-step,
+html[data-theme="light"] .table-panel th,
+html[data-theme="light"] .table-panel td { border-color: #e0e6e3; }
+html[data-theme="light"] .panel-head code,
+html[data-theme="light"] .table-panel header code { color: #596761; border-color: #d6dfdb; background: #f7f9f8; }
+html[data-theme="light"] .progress { background: #e7ece9; }
+
+@media (max-width: 700px) {
+  .platform-nav { padding-inline: 10px; font-size: 13px; }
+  .platform-nav strong { display: block; font-size: 12px; }
+  .platform-nav a { padding-inline: 10px; font-size: 13px; }
+}

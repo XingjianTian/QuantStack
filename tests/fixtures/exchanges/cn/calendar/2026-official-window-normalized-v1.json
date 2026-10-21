@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "version": "cn-official-2026-window-v1",
+  "market": "CN",
+  "exchanges": ["XSHG", "XSHE", "BJSE"],
+  "timezone": "Asia/Shanghai",
+  "open_time": "09:30:00",
+  "close_time": "15:00:00",
+  "supported_start": "2026-04-29",
+  "supported_end": "2026-05-07",
+  "days": [
+    {"trading_date": "2026-04-29", "state": "session"},
+    {"trading_date": "2026-04-30", "state": "session"},
+    {"trading_date": "2026-05-01", "state": "holiday"},
+    {"trading_date": "2026-05-02", "state": "weekend"},
+    {"trading_date": "2026-05-03", "state": "weekend"},
+    {"trading_date": "2026-05-04", "state": "holiday"},
+    {"trading_date": "2026-05-05", "state": "holiday"},
+    {"trading_date": "2026-05-06", "state": "session"},
+    {"trading_date": "2026-05-07", "state": "session"}
+  ],
+  "unknown_dates": [],
+  "temporary_closures": [],
+  "update_policy": "new_version"
+}

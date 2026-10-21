@@ -1,0 +1,49 @@
+ARG UPSTREAM_IMAGE
+FROM ${UPSTREAM_IMAGE}
+
+COPY --chown=stockscanner:stockscanner patches/patch_celery_schedule.py /tmp/patch_celery_schedule.py
+RUN python /tmp/patch_celery_schedule.py /app/app/celery_app.py \
+    && rm /tmp/patch_celery_schedule.py
+
+COPY --chown=stockscanner:stockscanner \
+    patches/patch_runtime_recovery.py \
+    /tmp/patch_runtime_recovery.py
+RUN python /tmp/patch_runtime_recovery.py /app \
+    && rm /tmp/patch_runtime_recovery.py
+
+COPY --chown=stockscanner:stockscanner \
+    patches/patch_snapshot_analytics_readiness.py \
+    /tmp/patch_snapshot_analytics_readiness.py
+RUN python /tmp/patch_snapshot_analytics_readiness.py /app \
+    && rm /tmp/patch_snapshot_analytics_readiness.py
+
+COPY --chown=stockscanner:stockscanner \
+    migrations/20260826_0025_add_daily_snapshot_filter_indexes.py \
+    /app/alembic/versions/20260826_0025_add_daily_snapshot_filter_indexes.py
+
+COPY --chown=stockscanner:stockscanner \
+    migrations/20260905_0026_add_scan_analytics_publication.py \
+    /app/alembic/versions/20260905_0026_add_scan_analytics_publication.py
+
+COPY --chown=stockscanner:stockscanner \
+    migrations/20260905_0027_add_daily_snapshot_publications.py \
+    /app/alembic/versions/20260905_0027_add_daily_snapshot_publications.py
+
+COPY --chown=stockscanner:stockscanner \
+    daily_snapshot_publication_model.py \
+    /app/app/models/daily_snapshot_publication.py
+
+COPY --chown=stockscanner:stockscanner \
+    daily_snapshot_publication.py \
+    /app/daily_snapshot_publication.py
+
+COPY --chown=stockscanner:stockscanner \
+    quantstack_scan_analytics.py \
+    /app/quantstack_scan_analytics.py
+
+COPY --chown=stockscanner:stockscanner \
+    reconcile_scan_analytics.py \
+    /app/reconcile_scan_analytics.py
+
+LABEL org.opencontainers.image.version="1.4.0-quant-runtime.16"
+LABEL org.opencontainers.image.description="Stock Screener v1.4.0 with bootstrapped atomic dual-market Snapshot publications, one-statement durable reads, and metadata-only cold-plan warmup"

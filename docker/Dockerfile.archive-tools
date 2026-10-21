@@ -1,0 +1,19 @@
+ARG BASE_IMAGE=personal/quant-stack-api:0.5.1
+FROM ${BASE_IMAGE}
+
+USER root
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml uv.lock README.md VERSION_LOCK.json ./
+COPY src ./src
+RUN uv sync --frozen --no-dev --extra archive --extra data
+
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+USER quant
+ENTRYPOINT ["quant-stack-ss-legacy-convert"]

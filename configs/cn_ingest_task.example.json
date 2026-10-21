@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.1.0",
+  "dataset_id": "cn_equity_daily",
+  "dataset_version": "2026-07-28.1",
+  "provider": "akshare_replay",
+  "provider_version": "1.18.81",
+  "endpoint": "stock_zh_a_hist",
+  "adapter_version": "contract-only",
+  "native_schema_version": "fixture-required-v1",
+  "market": "CN",
+  "instrument_scope": ["XSHG.600000", "XSHE.000001", "BJSE.430047"],
+  "start_date": "2026-07-27",
+  "end_date": "2026-07-28",
+  "frequency": "1d",
+  "max_attempts": 3,
+  "retry_backoff_seconds": 0,
+  "created_at": "2026-07-29T00:00:00Z"
+}

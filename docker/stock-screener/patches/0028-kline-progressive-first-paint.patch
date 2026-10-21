@@ -1,0 +1,71 @@
+diff --git a/src/components/Charts/CandlestickChart.jsx b/src/components/Charts/CandlestickChart.jsx
+index eb2e600..75747e9 100644
+--- a/src/components/Charts/CandlestickChart.jsx
++++ b/src/components/Charts/CandlestickChart.jsx
+@@ -36,7 +36,7 @@ const debounce = (fn, ms) => {
+   return debounced;
+ };
+ 
+-const INTERACTIVE_DAILY_HISTORY_PERIOD = '10y';
++const INTERACTIVE_DAILY_HISTORY_PERIOD = '2y';
+ const INTERACTIVE_DAILY_VISIBLE_BARS = 130;
+ 
+ /**
+@@ -396,16 +396,16 @@ function CandlestickChart({
+     }
+   }, [apiData, effectiveTimeframe, queryClient, symbol]);
+ 
+-  // Start the first ten-year history read as soon as the initial daily payload
+-  // is visible. This keeps rapid pans inside already-loaded data instead of
+-  // exposing a blank interval while a boundary-triggered request is in flight.
++  // Paint from a two-year foreground window, then start the ten-year
++  // predecessor read as soon as that payload is visible. Two years leaves
++  // several viewport widths for immediate panning while avoiding the render
++  // cost of blocking first paint on thousands of candles.
+   useEffect(() => {
+     if (
+       compact
+       || !interactive
+       || useBundledPriceData
+       || effectiveTimeframe !== 'daily'
+-      || loadsDeepDailyHistory
+       || !priceRequestSettled
+       || !Array.isArray(baseApiData)
+       || baseApiData.length === 0
+@@ -419,6 +419,5 @@ function CandlestickChart({
+     interactive,
+     loadOlderHistory,
+-    loadsDeepDailyHistory,
+     priceRequestSettled,
+     useBundledPriceData,
+   ]);
+diff --git a/src/components/Charts/CandlestickChart.streaming.test.jsx b/src/components/Charts/CandlestickChart.streaming.test.jsx
+index c6c8631..113408c 100644
+--- a/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -98,13 +98,13 @@ describe('CandlestickChart streaming history', () => {
+     };
+   });
+ 
+-  it('loads ten years in the first interactive request and keeps a fixed tail width', async () => {
++  it('paints two years first, starts one predecessor read, and keeps a fixed tail width', async () => {
+     renderChart();
+ 
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+     await screen.findByText('12.00');
+-    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '10y');
+-    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+     expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledWith({ from: 0, to: 1 });
+   });
+@@ -115,7 +115,7 @@ describe('CandlestickChart streaming history', () => {
+     renderChart();
+ 
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+-    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '10y');
++    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
+     expect(chartHarness.setVisibleLogicalRange).not.toHaveBeenCalled();
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+   });

@@ -1,0 +1,105 @@
+{
+  "schema_version": "1.0.0",
+  "source_set_id": "cn-historical-calendar-sources-v1",
+  "calendar_library": {
+    "distribution": "exchange-calendars",
+    "version": "4.13.2",
+    "calendar_name": "XSHG",
+    "timezone": "Asia/Shanghai",
+    "normal_open": "09:30:00+08:00",
+    "normal_close": "15:00:00+08:00",
+    "schedule_policy": "library-sessions-clipped-to-request-range"
+  },
+  "venues": ["XSHG", "XSHE"],
+  "official_sources": [
+    {
+      "venue": "XSHG",
+      "publisher": "Shanghai Stock Exchange",
+      "title": "Trading calendar and market closure notices index",
+      "url": "https://www.sse.com.cn/disclosure/dealinstruc/closed/list/",
+      "source_kind": "first_party_annual_index",
+      "coverage": "annual and temporary closure notices"
+    },
+    {
+      "venue": "XSHG",
+      "publisher": "Shanghai Stock Exchange",
+      "title": "2015 Spring Festival market closure notice",
+      "url": "https://www.sse.com.cn/disclosure/dealinstruc/closed/list/c/c_20160104_3979239.shtml",
+      "source_kind": "first_party_notice",
+      "coverage": "2015 Spring Festival closure"
+    },
+    {
+      "venue": "XSHG",
+      "publisher": "Shanghai Stock Exchange",
+      "title": "2015 annual holiday market closure notice",
+      "url": "https://www.sse.com.cn/disclosure/dealinstruc/closed/list/c/c_20160104_3979217.shtml",
+      "source_kind": "first_party_notice",
+      "coverage": "2015 annual holiday closure"
+    },
+    {
+      "venue": "XSHG",
+      "publisher": "Shanghai Stock Exchange",
+      "title": "2025 annual holiday market closure notice",
+      "url": "https://www.sse.com.cn/disclosure/dealinstruc/closed/c/c_20241223_10767110.shtml",
+      "source_kind": "first_party_notice",
+      "coverage": "2025 annual holiday closure"
+    },
+    {
+      "venue": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "2025 annual holiday market closure notice",
+      "url": "https://www.szse.cn/disclosure/notice/t20241223_611283.html",
+      "source_kind": "first_party_notice",
+      "coverage": "2025 annual holiday closure"
+    },
+    {
+      "venue": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "2025 Spring Festival market closure notice",
+      "url": "https://www.szse.cn/disclosure/notice/general/t20250123_611741.html",
+      "source_kind": "first_party_notice",
+      "coverage": "2025 Spring Festival closure"
+    },
+    {
+      "venue": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "2025 Labour Day market closure notice",
+      "url": "https://www.szse.cn/disclosure/notice/t20250424_613215.html",
+      "source_kind": "first_party_notice",
+      "coverage": "2025 Labour Day closure"
+    },
+    {
+      "venue": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "2026 Spring Festival market closure notice",
+      "url": "https://www.szse.cn/disclosure/notice/t20260206_618970.html",
+      "source_kind": "first_party_notice",
+      "coverage": "2026 Spring Festival closure"
+    },
+    {
+      "venue": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "2026 Labour Day market closure notice",
+      "url": "https://www.szse.cn/disclosure/notice/general/t20260423_620142.html",
+      "source_kind": "first_party_notice",
+      "coverage": "2026 Labour Day closure"
+    },
+    {
+      "venue": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "2026 Dragon Boat Festival market closure notice",
+      "url": "https://www.szse.cn/disclosure/notice/general/t20260611_620979.html",
+      "source_kind": "first_party_notice",
+      "coverage": "2026 Dragon Boat Festival closure"
+    }
+  ],
+  "temporary_closure_dates": [],
+  "unsupported_special_half_days": [],
+  "classification_policy": {
+    "session": "exchange-calendars XSHG session",
+    "weekend": "Saturday or Sunday outside the session set",
+    "temporary_closure": "explicit date in this source set",
+    "holiday": "weekday outside the session set after official-source cross-check",
+    "unknown": "never silently assigned; build fails if any date remains unknown"
+  }
+}

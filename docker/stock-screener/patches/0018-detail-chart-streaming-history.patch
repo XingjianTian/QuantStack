@@ -1,0 +1,593 @@
+diff --git a/frontend/src/api/priceHistory.js b/frontend/src/api/priceHistory.js
+index 685ddda..8911aa0 100644
+--- a/frontend/src/api/priceHistory.js
++++ b/frontend/src/api/priceHistory.js
+@@ -17,9 +17,10 @@ export const fetchPriceHistory = async (symbol, period = '6mo') => {
+   return response.data;
+ };
+ 
+-export const fetchPriceHistoryRange = async (symbol, start, end) => {
++export const fetchPriceHistoryRange = async (symbol, start, end, { signal } = {}) => {
+   const response = await apiClient.get(`/v1/stocks/${symbol}/history-range`, {
+     params: { start, end },
++    signal,
+   });
+   return response.data;
+ };
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index a9ddfe9..e9ef194 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -1,4 +1,4 @@
+-import { useRef, useEffect, useLayoutEffect, useState, useMemo } from 'react';
++import { useRef, useEffect, useLayoutEffect, useState, useMemo, useCallback } from 'react';
+ import { Box, CircularProgress, Alert, AlertTitle, Button, ToggleButtonGroup, ToggleButton, useTheme, Typography } from '@mui/material';
+ import { createPriceChartSeries } from './createPriceChartSeries';
+ import { useQuery, useQueryClient } from '@tanstack/react-query';
+@@ -8,17 +8,14 @@ import ChartSkeleton from './ChartSkeleton';
+ import { transformToCandlestickData } from './candlestickData';
+ import {
+   CHART_TIMEFRAMES,
+-  chartWheelIntent,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+   mergePriceHistory,
+-  missingDailyHistoryRange,
+-  nextDailyHistoryPeriod,
+-  pannedLogicalRange,
+-  queueHistoryExpansion,
++  previousHistoryPage,
++  shouldPrefetchOlderHistory,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+@@ -83,12 +80,12 @@ function CandlestickChart({
+   const latestCandleRef = useRef(null); // Store latest candle for default display
+   const previousTimeframeRef = useRef('daily');
+   const fitTimeframeWhenSettledRef = useRef(false);
+-  const historyExpansionPendingRef = useRef(false);
+-  const historyExpansionTimerRef = useRef(null);
++  const historyRequestPendingRef = useRef(false);
++  const historyExhaustedRef = useRef(false);
++  const historyDemandArmedRef = useRef(false);
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(() => defaultShowRsLine(symbol)); // RS line overlay toggle
+-  const [dailyHistoryPeriod, setDailyHistoryPeriod] = useState(period);
+   const [olderDailyData, setOlderDailyData] = useState([]);
+   const [legendData, setLegendData] = useState(null); // OHLC legend data on hover
+   const [rsBandTop, setRsBandTop] = useState(0.66); // top margin of the live RS band
+@@ -103,8 +100,10 @@ function CandlestickChart({
+   const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData);
+ 
+   useEffect(() => {
+-    setDailyHistoryPeriod(period);
+     setOlderDailyData([]);
++    historyRequestPendingRef.current = false;
++    historyExhaustedRef.current = false;
++    historyDemandArmedRef.current = false;
+   }, [period, symbol]);
+ 
+   useEffect(() => {
+@@ -328,7 +327,7 @@ function CandlestickChart({
+     if (!chartRef.current) return;
+     chartRef.current.applyOptions({
+       handleScroll: interactive ? {
+-        mouseWheel: false,
++        mouseWheel: true,
+         pressedMouseMove: true,
+         horzTouchDrag: true,
+         vertTouchDrag: false,
+@@ -336,73 +335,87 @@ function CandlestickChart({
+       handleScale: interactive ? {
+         axisPressedMouseMove: true,
+         mouseWheel: false,
+-        pinch: false,
++        pinch: true,
+       } : false,
++      kineticScroll: interactive ? { mouse: true, touch: true } : { mouse: false, touch: false },
++      timeScale: { fixLeftEdge: false, fixRightEdge: true },
+     });
+   }, [interactive]);
+ 
+-  // Trackpad scrolling pans by a clamped logical range and never changes the
+-  // visible bar count. Browser pinch emits ctrl+wheel, which is the only wheel
+-  // gesture that changes scale.
++  const loadOlderHistory = useCallback(async () => {
++    if (
++      effectiveTimeframe !== 'daily'
++      || historyRequestPendingRef.current
++      || historyExhaustedRef.current
++    ) return;
++
++    const earliest = apiData?.[0]?.time ?? apiData?.[0]?.date;
++    const range = previousHistoryPage(earliest);
++    if (!range) return;
++
++    historyRequestPendingRef.current = true;
++    try {
++      const points = await queryClient.fetchQuery({
++        queryKey: priceHistoryKeys.range(symbol, range.start, range.end),
++        queryFn: ({ signal }) => fetchPriceHistoryRange(
++          symbol,
++          range.start,
++          range.end,
++          { signal },
++        ),
++        staleTime: PRICE_HISTORY_STALE_TIME,
++        retry: false,
++      });
++      if (!Array.isArray(points) || points.length === 0) {
++        historyExhaustedRef.current = true;
++        return;
++      }
++      setOlderDailyData((current) => mergePriceHistory(current, points));
++    } catch (historyError) {
++      if (historyError?.response?.status === 404) {
++        historyExhaustedRef.current = true;
++      }
++    } finally {
++      historyRequestPendingRef.current = false;
++    }
++  }, [apiData, effectiveTimeframe, queryClient, symbol]);
++
++  // Match the main-market chart's datafeed semantics: let Lightweight Charts
++  // own pan/drag momentum, then prefetch one older local page before the user
++  // reaches the hard edge. Initial render alone never arms history loading.
+   useEffect(() => {
+     const container = chartContainerRef.current;
+-    if (!container || compact || !interactive) return undefined;
++    const chart = chartRef.current;
++    const series = candlestickSeriesRef.current;
++    if (!container || !chart || !series || compact || !interactive) return undefined;
+ 
+-    const handleWheel = (event) => {
+-      if (!chartRef.current) return;
+-      const timeScale = chartRef.current.timeScale();
+-      const current = timeScale.getVisibleLogicalRange();
+-      const barCount = chartData?.candlesticks?.length ?? 0;
+-      const intent = chartWheelIntent(event);
+-      const wheelDelta = event.deltaX || event.deltaY;
+-      const next = intent === 'zoom'
+-        ? zoomedLogicalRange(current, event.deltaY < 0 ? 'in' : 'out', barCount)
+-        : pannedLogicalRange(current, wheelDelta, barCount);
+-      event.preventDefault();
+-      if (!next) {
+-        if (intent === 'pan' && wheelDelta < 0 && effectiveTimeframe === 'daily') {
+-          queueHistoryExpansion(historyExpansionTimerRef, () => {
+-            const expandedPeriod = nextDailyHistoryPeriod(dailyHistoryPeriod);
+-            if (expandedPeriod === dailyHistoryPeriod || historyExpansionPendingRef.current) return;
+-            const earliest = apiData?.[0]?.time ?? apiData?.[0]?.date;
+-            const range = missingDailyHistoryRange(expandedPeriod, earliest);
+-            if (!range) return;
+-            historyExpansionPendingRef.current = true;
+-            queryClient.fetchQuery({
+-              queryKey: priceHistoryKeys.range(symbol, range.start, range.end),
+-              queryFn: () => fetchPriceHistoryRange(symbol, range.start, range.end),
+-              staleTime: PRICE_HISTORY_STALE_TIME,
+-            }).then((points) => {
+-              setOlderDailyData((current) => mergePriceHistory(current, points || []));
+-              setDailyHistoryPeriod(expandedPeriod);
+-            }).finally(() => {
+-              historyExpansionPendingRef.current = false;
+-            });
+-          });
+-        }
+-        return;
++    const timeScale = chart.timeScale();
++    const armHistoryDemand = () => {
++      historyDemandArmedRef.current = true;
++    };
++    const handleLogicalRangeChange = (range) => {
++      if (!range) return;
++      const barsInfo = series.barsInLogicalRange(range);
++      if (shouldPrefetchOlderHistory(barsInfo, {
++        demandArmed: historyDemandArmedRef.current,
++        pending: historyRequestPendingRef.current,
++        exhausted: historyExhaustedRef.current,
++      })) {
++        loadOlderHistory();
+       }
+-      clearTimeout(historyExpansionTimerRef.current);
+-      historyExpansionTimerRef.current = null;
+-      timeScale.setVisibleLogicalRange(next);
+     };
+ 
+-    container.addEventListener('wheel', handleWheel, { passive: false });
++    container.addEventListener('wheel', armHistoryDemand, { passive: true });
++    container.addEventListener('pointerdown', armHistoryDemand, { passive: true });
++    container.addEventListener('touchstart', armHistoryDemand, { passive: true });
++    timeScale.subscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+     return () => {
+-      container.removeEventListener('wheel', handleWheel);
+-      clearTimeout(historyExpansionTimerRef.current);
+-      historyExpansionTimerRef.current = null;
++      container.removeEventListener('wheel', armHistoryDemand);
++      container.removeEventListener('pointerdown', armHistoryDemand);
++      container.removeEventListener('touchstart', armHistoryDemand);
++      timeScale.unsubscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+     };
+-  }, [
+-    chartData?.candlesticks?.length,
+-    compact,
+-    dailyHistoryPeriod,
+-    effectiveTimeframe,
+-    interactive,
+-    apiData,
+-    queryClient,
+-    symbol,
+-  ]);
++  }, [chartData, compact, interactive, loadOlderHistory]);
+ 
+   // Subscribe to visible time range changes
+   useEffect(() => {
+@@ -428,8 +441,8 @@ function CandlestickChart({
+     };
+   }, [onVisibleRangeChange, symbol]);
+ 
+-  // Cmd/Ctrl +/- changes the visible bar count. Trackpad pan and pinch are
+-  // handled above so a two-finger slide never changes the visible bar count.
++  // Cmd/Ctrl +/- changes the visible bar count. Native wheel, drag and pinch
++  // stay enabled so the detail chart has the same continuous feel as Key Markets.
+   useEffect(() => {
+     if (compact || !interactive) return undefined;
+ 
+@@ -767,6 +780,7 @@ function CandlestickChart({
+       {/* Chart Container - always rendered so useLayoutEffect can initialize */}
+       <div
+         ref={chartContainerRef}
++        data-testid="candlestick-chart-canvas"
+         style={{
+           width: '100%',
+           height: '100%',
+diff --git a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+new file mode 100644
+index 0000000..69eacf1
+--- /dev/null
++++ b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -0,0 +1,109 @@
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
++import { fireEvent, render, screen, waitFor } from '@testing-library/react';
++import { ThemeProvider, createTheme } from '@mui/material/styles';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++import CandlestickChart from './CandlestickChart';
++
++const chartHarness = vi.hoisted(() => ({
++  logicalRangeHandler: null,
++  fetchRange: vi.fn(),
++}));
++
++vi.mock('../../api/priceHistory', () => ({
++  fetchPriceHistory: vi.fn(async () => ([
++    { date: '2026-03-01', open: 10, high: 12, low: 9, close: 11, volume: 100 },
++    { date: '2026-03-02', open: 11, high: 13, low: 10, close: 12, volume: 120 },
++  ])),
++  fetchPriceHistoryRange: (...args) => chartHarness.fetchRange(...args),
++  fetchRSLine: vi.fn(async () => null),
++  priceHistoryKeys: {
++    symbol: (symbol, period) => ['priceHistory', symbol, period],
++    range: (symbol, start, end) => ['priceHistory', symbol, 'range', start, end],
++    rsLine: (symbol, period) => ['priceHistory', 'rsLine', symbol, period],
++  },
++  PRICE_HISTORY_STALE_TIME: 300000,
++}));
++
++vi.mock('./createPriceChartSeries', () => {
++  const series = () => ({
++    setData: vi.fn(),
++    barsInLogicalRange: vi.fn(() => ({ barsBefore: 20 })),
++    priceScale: () => ({ applyOptions: vi.fn() }),
++  });
++  const timeScale = {
++    fitContent: vi.fn(),
++    getVisibleRange: vi.fn(() => ({ from: '2026-03-01', to: '2026-03-02' })),
++    getVisibleLogicalRange: vi.fn(() => ({ from: 0, to: 1 })),
++    setVisibleRange: vi.fn(),
++    setVisibleLogicalRange: vi.fn(),
++    subscribeVisibleLogicalRangeChange: vi.fn((handler) => {
++      chartHarness.logicalRangeHandler = handler;
++    }),
++    unsubscribeVisibleLogicalRangeChange: vi.fn(),
++    subscribeVisibleTimeRangeChange: vi.fn(),
++    unsubscribeVisibleTimeRangeChange: vi.fn(),
++  };
++  return {
++    createPriceChartSeries: vi.fn(() => ({
++      chart: {
++        timeScale: () => timeScale,
++        subscribeCrosshairMove: vi.fn(),
++        applyOptions: vi.fn(),
++        resize: vi.fn(),
++        remove: vi.fn(),
++      },
++      volumeSeries: series(),
++      candlestickSeries: series(),
++      ema10Series: series(),
++      ema20Series: series(),
++      ema50Series: series(),
++      rsLineSeries: series(),
++      rsMarkers: { setMarkers: vi.fn() },
++    })),
++  };
++});
++
++const renderChart = () => {
++  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++  return render(
++    <ThemeProvider theme={createTheme({ palette: { mode: 'dark' } })}>
++      <QueryClientProvider client={queryClient}>
++        <CandlestickChart symbol="600000.SS" height={400} />
++      </QueryClientProvider>
++    </ThemeProvider>,
++  );
++};
++
++describe('CandlestickChart streaming history', () => {
++  beforeEach(() => {
++    chartHarness.logicalRangeHandler = null;
++    chartHarness.fetchRange.mockReset();
++    chartHarness.fetchRange.mockImplementation(() => new Promise(() => {}));
++    globalThis.ResizeObserver = class {
++      observe() {}
++      disconnect() {}
++    };
++  });
++
++  it('does not prefetch on mount and keeps only one older-page request in flight', async () => {
++    renderChart();
++
++    await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
++    await screen.findByText('12.00');
++    chartHarness.logicalRangeHandler({ from: 0, to: 1 });
++    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++
++    fireEvent.wheel(screen.getByTestId('candlestick-chart-canvas'));
++    chartHarness.logicalRangeHandler({ from: -1, to: 1 });
++    chartHarness.logicalRangeHandler({ from: -2, to: 0 });
++
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    expect(chartHarness.fetchRange).toHaveBeenCalledWith(
++      '600000.SS',
++      '2025-01-25',
++      '2026-02-28',
++      expect.objectContaining({ signal: expect.any(AbortSignal) }),
++    );
++  });
++});
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index 0444c87..8157441 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -14,39 +14,40 @@ export const historyPeriodForTimeframe = (timeframe, fallback = '6mo') => (
+ 
+ export const defaultShowRsLine = (symbol) => !/\.(SS|SZ)$/i.test(symbol || '');
+ 
+-export const queueHistoryExpansion = (timerRef, callback, delay = 160) => {
+-  clearTimeout(timerRef.current);
+-  timerRef.current = setTimeout(() => {
+-    timerRef.current = null;
+-    callback();
+-  }, delay);
+-};
+-
+-const DAILY_HISTORY_PERIODS = ['6mo', '2y', '5y', '10y'];
+-
+-export const nextDailyHistoryPeriod = (period) => {
+-  const index = DAILY_HISTORY_PERIODS.indexOf(period);
+-  if (index < 0) return '2y';
+-  return DAILY_HISTORY_PERIODS[Math.min(index + 1, DAILY_HISTORY_PERIODS.length - 1)];
+-};
+-
+-const DAILY_PERIOD_YEARS = { '2y': 2, '5y': 5, '10y': 10 };
+-
+-export const missingDailyHistoryRange = (period, earliestDate) => {
+-  const years = DAILY_PERIOD_YEARS[period];
+-  if (!years || !earliestDate) return null;
++export const STREAMING_HISTORY_PAGE_DAYS = 400;
++export const STREAMING_HISTORY_PREFETCH_BARS = 50;
++
++export const previousHistoryPage = (
++  earliestDate,
++  pageDays = STREAMING_HISTORY_PAGE_DAYS,
++) => {
++  if (!earliestDate || !Number.isInteger(pageDays) || pageDays < 1) return null;
+   const earliest = new Date(`${earliestDate}T00:00:00Z`);
+   if (Number.isNaN(earliest.getTime())) return null;
+   const end = new Date(earliest);
+   end.setUTCDate(end.getUTCDate() - 1);
+-  const start = new Date();
+-  start.setUTCHours(0, 0, 0, 0);
+-  start.setUTCFullYear(start.getUTCFullYear() - years);
++  const start = new Date(end);
++  start.setUTCDate(start.getUTCDate() - pageDays + 1);
+   const format = (value) => value.toISOString().slice(0, 10);
+-  if (start > end) return null;
+   return { start: format(start), end: format(end) };
+ };
+ 
++export const shouldPrefetchOlderHistory = (
++  barsInfo,
++  {
++    demandArmed = false,
++    pending = false,
++    exhausted = false,
++    threshold = STREAMING_HISTORY_PREFETCH_BARS,
++  } = {},
++) => (
++  demandArmed
++  && !pending
++  && !exhausted
++  && Number.isFinite(barsInfo?.barsBefore)
++  && barsInfo.barsBefore <= threshold
++);
++
+ export const mergePriceHistory = (...segments) => {
+   const byDate = new Map();
+   segments.flat().forEach((point) => {
+@@ -98,22 +99,3 @@ export const clampLogicalRange = (range, barCount) => {
+   const from = Math.min(lastIndex - span, Math.max(0, range.from));
+   return { from, to: from + span };
+ };
+-
+-export const pannedLogicalRange = (range, wheelDelta, barCount) => {
+-  if (!range || !Number.isFinite(wheelDelta) || wheelDelta === 0) return null;
+-  const span = range.to - range.from;
+-  const shift = Math.sign(wheelDelta) * Math.max(1, span * Math.min(Math.abs(wheelDelta) / 800, 0.15));
+-  const next = clampLogicalRange({ from: range.from + shift, to: range.to + shift }, barCount);
+-  if (!next) return null;
+-  if (Math.abs(next.from - range.from) < 0.001 && Math.abs(next.to - range.to) < 0.001) {
+-    return null;
+-  }
+-  return next;
+-};
+-
+-export const chartWheelIntent = (event) => {
+-  const horizontal = Math.abs(Number(event?.deltaX) || 0);
+-  const vertical = Math.abs(Number(event?.deltaY) || 0);
+-  if ((event?.ctrlKey || event?.metaKey) && vertical > horizontal * 1.5) return 'zoom';
+-  return 'pan';
+-};
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index 0c44936..039a192 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -1,30 +1,17 @@
+-import { describe, expect, it, vi } from 'vitest';
++import { describe, expect, it } from 'vitest';
+ import {
+-  chartWheelIntent,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
+   historyPeriodForTimeframe,
+-  nextDailyHistoryPeriod,
+   isDailyTimeframe,
+   mergePriceHistory,
+-  missingDailyHistoryRange,
+-  pannedLogicalRange,
+-  queueHistoryExpansion,
++  previousHistoryPage,
++  shouldPrefetchOlderHistory,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+ 
+-describe('chartWheelIntent', () => {
+-  it('keeps horizontal two-finger motion as pan even when a modifier leaks through', () => {
+-    expect(chartWheelIntent({ ctrlKey: true, deltaX: 30, deltaY: 8 })).toBe('pan');
+-  });
+-
+-  it('recognizes a vertical browser pinch gesture as zoom', () => {
+-    expect(chartWheelIntent({ ctrlKey: true, deltaX: 0, deltaY: -12 })).toBe('zoom');
+-  });
+-});
+-
+ describe('chart timeframe controls', () => {
+   it('loads only the history window needed by the selected view', () => {
+     expect(historyPeriodForTimeframe('five-day')).toBe('1mo');
+@@ -35,17 +22,30 @@ describe('chart timeframe controls', () => {
+     expect(historyPeriodForTimeframe('yearly')).toBe('10y');
+   });
+ 
+-  it('expands daily history in bounded local steps', () => {
+-    expect(nextDailyHistoryPeriod('6mo')).toBe('2y');
+-    expect(nextDailyHistoryPeriod('2y')).toBe('5y');
+-    expect(nextDailyHistoryPeriod('5y')).toBe('10y');
+-    expect(nextDailyHistoryPeriod('10y')).toBe('10y');
++  it('requests one fixed non-overlapping page before the earliest loaded bar', () => {
++    expect(previousHistoryPage('2026-03-01', 400)).toEqual({
++      start: '2025-01-25',
++      end: '2026-02-28',
++    });
++    expect(previousHistoryPage('bad-date')).toBeNull();
++    expect(previousHistoryPage('2026-03-01', 0)).toBeNull();
++  });
++
++  it('prefetches only after user demand enters the left threshold', () => {
++    expect(shouldPrefetchOlderHistory({ barsBefore: 50 }, { demandArmed: true })).toBe(true);
++    expect(shouldPrefetchOlderHistory({ barsBefore: 51 }, { demandArmed: true })).toBe(false);
++    expect(shouldPrefetchOlderHistory({ barsBefore: 10 })).toBe(false);
++    expect(shouldPrefetchOlderHistory(
++      { barsBefore: 10 },
++      { demandArmed: true, pending: true },
++    )).toBe(false);
++    expect(shouldPrefetchOlderHistory(
++      { barsBefore: 10 },
++      { demandArmed: true, exhausted: true },
++    )).toBe(false);
+   });
+ 
+-  it('requests only the missing older segment and merges it without duplicates', () => {
+-    const range = missingDailyHistoryRange('2y', '2026-03-01');
+-    expect(range?.end).toBe('2026-02-28');
+-    expect(range?.start < range?.end).toBe(true);
++  it('merges streamed pages without duplicate bars', () => {
+     expect(mergePriceHistory(
+       [{ date: '2026-02-27', close: 8 }, { date: '2026-03-01', close: 9 }],
+       [{ date: '2026-03-01', close: 10 }, { date: '2026-03-02', close: 11 }],
+@@ -56,20 +56,6 @@ describe('chart timeframe controls', () => {
+     ]);
+   });
+ 
+-  it('collapses a wheel burst into one history expansion', () => {
+-    vi.useFakeTimers();
+-    const timerRef = { current: null };
+-    const expand = vi.fn();
+-
+-    queueHistoryExpansion(timerRef, expand);
+-    queueHistoryExpansion(timerRef, expand);
+-    queueHistoryExpansion(timerRef, expand);
+-    vi.advanceTimersByTime(160);
+-
+-    expect(expand).toHaveBeenCalledTimes(1);
+-    vi.useRealTimers();
+-  });
+-
+   it('keeps the RS overlay on the full daily view only', () => {
+     expect(isDailyTimeframe('five-day')).toBe(false);
+     expect(isDailyTimeframe('daily')).toBe(true);
+@@ -115,9 +101,4 @@ describe('chart timeframe controls', () => {
+     expect(zoomedLogicalRange({ from: 0, to: 100 }, 'out', 110)).toEqual({ from: 0, to: 109 });
+   });
+ 
+-  it('pans without changing scale and stops at either data edge', () => {
+-    expect(pannedLogicalRange({ from: 20, to: 60 }, 100, 200)).toEqual({ from: 25, to: 65 });
+-    expect(pannedLogicalRange({ from: 0, to: 40 }, -100, 200)).toBeNull();
+-    expect(pannedLogicalRange({ from: 159, to: 199 }, 100, 200)).toBeNull();
+-  });
+ });
+diff --git a/frontend/src/components/Charts/createPriceChartSeries.js b/frontend/src/components/Charts/createPriceChartSeries.js
+index 4c17302..ccf0d09 100644
+--- a/frontend/src/components/Charts/createPriceChartSeries.js
++++ b/frontend/src/components/Charts/createPriceChartSeries.js
+@@ -32,12 +32,12 @@ export function createPriceChartSeries(container, { width, height, isDarkMode, i
+       borderColor: isDarkMode ? '#485263' : '#cccccc',
+       timeVisible: true,
+       secondsVisible: false,
+-      fixLeftEdge: true,
++      fixLeftEdge: false,
+       fixRightEdge: true,
+       lockVisibleTimeRangeOnResize: true,
+     },
+     handleScroll: interactive ? {
+-      mouseWheel: false,
++      mouseWheel: true,
+       pressedMouseMove: true,
+       horzTouchDrag: true,
+       vertTouchDrag: false,
+@@ -45,9 +45,9 @@ export function createPriceChartSeries(container, { width, height, isDarkMode, i
+     handleScale: interactive ? {
+       axisPressedMouseMove: true,
+       mouseWheel: false,
+-      pinch: false,
++      pinch: true,
+     } : false,
+-    kineticScroll: { mouse: false, touch: false },
++    kineticScroll: { mouse: true, touch: true },
+   });
+ 
+   // Volume (bottom). Neutral scaleMargins; reapplied by the RS strip layout effect.

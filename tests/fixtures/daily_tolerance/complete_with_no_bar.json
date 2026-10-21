@@ -1,0 +1,13 @@
+{
+  "market": "US",
+  "session": "2026-09-18",
+  "snapshot_id": "us-equity-xnas-xnys-2026-08-27.v1",
+  "universe_ids": ["XNAS.A", "XNAS.B", "XNYS.C", "XNYS.D"],
+  "outcomes": {
+    "XNAS.A": "returned",
+    "XNAS.B": "returned",
+    "XNYS.C": "returned",
+    "XNYS.D": "no_bar"
+  },
+  "no_bar_evidence_ids": ["XNYS.D"]
+}

@@ -1,0 +1,26 @@
+diff --git a/src/components/Scan/ChartViewerModalLazy.jsx b/src/components/Scan/ChartViewerModalLazy.jsx
+index a581e92..e4feff1 100644
+--- a/src/components/Scan/ChartViewerModalLazy.jsx
++++ b/src/components/Scan/ChartViewerModalLazy.jsx
+@@ -1,19 +1,10 @@
+-import { lazy, Suspense } from 'react';
+-
+-// ChartViewerModal pulls in CandlestickChart and the lightweight-charts
+-// vendor bundle. Loading it on first open keeps that bundle out of the
+-// initial page load.
+-const ChartViewerModal = lazy(() => import('./ChartViewerModal'));
++import ChartViewerModal from './ChartViewerModal';
+ 
+ function ChartViewerModalLazy(props) {
+   if (!props.open) {
+     return null;
+   }
+-  return (
+-    <Suspense fallback={null}>
+-      <ChartViewerModal {...props} />
+-    </Suspense>
+-  );
++  return <ChartViewerModal {...props} />;
+ }
+ 
+ export default ChartViewerModalLazy;

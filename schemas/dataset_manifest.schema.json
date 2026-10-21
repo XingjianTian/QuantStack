@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/dataset_manifest/1.0.0",
+  "title": "Dataset Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "dataset_id", "version", "kind", "market", "provider",
+    "frequency", "storage_uri", "format", "schema_ref", "fetched_at",
+    "available_at_policy", "revision_policy", "quality_status", "license_scope",
+    "source_url"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "dataset_id": {"type": "string"},
+    "version": {"type": "string"},
+    "kind": {"enum": ["market_bars", "etf", "fundamentals", "news", "text", "factor", "backtest_result"]},
+    "market": {"type": "string"},
+    "provider": {"type": "string"},
+    "frequency": {"type": "string"},
+    "storage_uri": {"type": "string", "pattern": "^quant-data://"},
+    "format": {"enum": ["parquet", "jsonl", "csv", "duckdb"]},
+    "schema_ref": {"type": "string"},
+    "fetched_at": {"type": "string", "format": "date-time"},
+    "available_at_policy": {"type": "string"},
+    "revision_policy": {"type": "string"},
+    "sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "row_count": {"type": ["integer", "null"], "minimum": 0},
+    "quality_status": {"type": "string"},
+    "license_scope": {"type": "string"},
+    "source_url": {"type": "string"}
+  }
+}

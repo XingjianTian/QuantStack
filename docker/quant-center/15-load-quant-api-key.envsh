@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+secret_path=/run/secrets/quant_api_key
+
+if [ ! -s "$secret_path" ]; then
+    echo "Quant Center API key secret is missing or empty" >&2
+    exit 1
+fi
+
+QUANT_API_KEY="$(tr -d '\r\n' < "$secret_path")"
+case "$QUANT_API_KEY" in
+    ""|*[!A-Za-z0-9._~-]*)
+        echo "Quant Center API key secret contains unsupported characters" >&2
+        exit 1
+        ;;
+esac
+
+export QUANT_API_KEY
+export NGINX_ENVSUBST_FILTER='^QUANT_API_KEY$'

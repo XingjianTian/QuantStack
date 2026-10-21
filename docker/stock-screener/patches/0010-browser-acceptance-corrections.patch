@@ -1,0 +1,57 @@
+diff --git a/frontend/src/components/Layout/MarketSelector.jsx b/frontend/src/components/Layout/MarketSelector.jsx
+index c77d187..554227a 100644
+--- a/frontend/src/components/Layout/MarketSelector.jsx
++++ b/frontend/src/components/Layout/MarketSelector.jsx
+@@ -1,17 +1,19 @@
+ import { MenuItem, Select } from '@mui/material';
+ import { useNavigate } from 'react-router-dom';
+ 
+-import { useMarket } from '../../contexts/MarketContext';
++import { MARKET_STORAGE_KEY, useMarket } from '../../contexts/MarketContext';
+ import { marketFlag } from '../../utils/marketFlags';
+ 
+ function MarketSelector() {
+-  const { selectedMarket, setSelectedMarket, selectableMarkets, marketLabel } = useMarket();
++  const { selectedMarket, selectableMarkets, marketLabel } = useMarket();
+   const navigate = useNavigate();
+ 
+   const handleChange = (event) => {
+     const market = event.target.value;
+-    setSelectedMarket(market);
+-    navigate({ pathname: '/', search: `?market=${encodeURIComponent(market)}` });
++    if (typeof window !== 'undefined') {
++      window.localStorage.setItem(MARKET_STORAGE_KEY, market);
++    }
++    navigate({ pathname: '/', search: `?market=${encodeURIComponent(market)}` }, { replace: true });
+   };
+ 
+   if (selectableMarkets.length < 2) {
+diff --git a/frontend/src/pages/GroupRankingsPage.jsx b/frontend/src/pages/GroupRankingsPage.jsx
+index 4be4e9c0..c62463a 100644
+--- a/frontend/src/pages/GroupRankingsPage.jsx
++++ b/frontend/src/pages/GroupRankingsPage.jsx
+@@ -742,7 +742,10 @@ function GroupRankingsPage() {
+   );
+ 
+   if (errorRankings && !isRrgView) {
+-    const noPublishedRankings = errorRankings?.response?.status === 404;
++    const noPublishedRankings = [
++      errorRankings?.status,
++      errorRankings?.response?.status,
++    ].includes(404);
+     return (
+       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+         {features.tasks && selectedMarket === 'US' && (
+diff --git a/frontend/src/pages/GroupRankingsPage.test.jsx b/frontend/src/pages/GroupRankingsPage.test.jsx
+index 77a14b97..3b2f86e 100644
+--- a/frontend/src/pages/GroupRankingsPage.test.jsx
++++ b/frontend/src/pages/GroupRankingsPage.test.jsx
+@@ -217,7 +217,7 @@ describe('GroupRankingsPage', () => {
+ 
+   it('renders unpublished rankings as an informative empty state', async () => {
+     getCurrentRankings.mockRejectedValueOnce({
+-      response: { status: 404 },
++      status: 404,
+       message: 'Request failed with status code 404',
+     });
+ 

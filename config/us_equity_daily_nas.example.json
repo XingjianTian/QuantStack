@@ -1,0 +1,16 @@
+{
+  "schema_version": "quantstack.us-equity-session-daily.v1",
+  "snapshot": "${QUANT_US_INSTRUMENT_SNAPSHOT}",
+  "state": "${QUANT_RUNTIME_ROOT}/us-equity-daily-nas/state.json",
+  "initial_watermark": "2026-08-26",
+  "work_root": "${QUANT_RUNTIME_ROOT}/us-equity-daily-nas",
+  "session_parquet_root": "${QUANT_DATA_ROOT}/daily-session-parquet",
+  "market_index_root": "${QUANT_DATA_ROOT}/us-market-indexes",
+  "yfinance_runtime_root": "${QUANT_RUNTIME_ROOT}/yfinance",
+  "yfinance_proxy_url": "${QUANT_YFINANCE_PROXY_URL}",
+  "session_readiness_symbol": "SPY",
+  "session_readiness_retry_seconds": 3600,
+  "session_readiness_max_attempts": 8,
+  "provider_threads": 48,
+  "provider_batch_size": 128
+}

@@ -1,0 +1,14 @@
+title = "QuantStack privacy checks"
+
+[extend]
+useDefault = true
+
+# Only these two exact synthetic curl credentials in the gateway test are exempt.
+[[rules]]
+id = "curl-auth-user"
+[[rules.allowlists]]
+description = "Explicitly fictional gateway test credentials"
+condition = "AND"
+paths = ['''(^|/)scripts/verify_openresty_gateway\.sh$''']
+regexTarget = "secret"
+regexes = ['''^gateway-test-user:(wrong|gateway-test-password)$''']

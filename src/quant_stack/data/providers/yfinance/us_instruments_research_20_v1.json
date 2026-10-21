@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "snapshot_id": "us-equity-research-20-2026-08-24.v1",
+  "as_of": "2026-08-24T00:00:00Z",
+  "source": "curated_research_snapshot",
+  "update_policy": "new_version",
+  "instruments": [
+    {"instrument_id": "XNAS.AAPL", "symbol": "AAPL", "canonical_venue": "XNAS", "provider_symbol": "AAPL", "name": "Apple Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.MSFT", "symbol": "MSFT", "canonical_venue": "XNAS", "provider_symbol": "MSFT", "name": "Microsoft Corporation", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.NVDA", "symbol": "NVDA", "canonical_venue": "XNAS", "provider_symbol": "NVDA", "name": "NVIDIA Corporation", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.AMZN", "symbol": "AMZN", "canonical_venue": "XNAS", "provider_symbol": "AMZN", "name": "Amazon.com, Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.GOOGL", "symbol": "GOOGL", "canonical_venue": "XNAS", "provider_symbol": "GOOGL", "name": "Alphabet Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.META", "symbol": "META", "canonical_venue": "XNAS", "provider_symbol": "META", "name": "Meta Platforms, Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.AVGO", "symbol": "AVGO", "canonical_venue": "XNAS", "provider_symbol": "AVGO", "name": "Broadcom Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.COST", "symbol": "COST", "canonical_venue": "XNAS", "provider_symbol": "COST", "name": "Costco Wholesale Corporation", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.NFLX", "symbol": "NFLX", "canonical_venue": "XNAS", "provider_symbol": "NFLX", "name": "Netflix, Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.AMD", "symbol": "AMD", "canonical_venue": "XNAS", "provider_symbol": "AMD", "name": "Advanced Micro Devices, Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.IBM", "symbol": "IBM", "canonical_venue": "XNYS", "provider_symbol": "IBM", "name": "International Business Machines Corporation", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.JPM", "symbol": "JPM", "canonical_venue": "XNYS", "provider_symbol": "JPM", "name": "JPMorgan Chase & Co.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.BRK-B", "symbol": "BRK-B", "canonical_venue": "XNYS", "provider_symbol": "BRK-B", "name": "Berkshire Hathaway Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.V", "symbol": "V", "canonical_venue": "XNYS", "provider_symbol": "V", "name": "Visa Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.MA", "symbol": "MA", "canonical_venue": "XNYS", "provider_symbol": "MA", "name": "Mastercard Incorporated", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.UNH", "symbol": "UNH", "canonical_venue": "XNYS", "provider_symbol": "UNH", "name": "UnitedHealth Group Incorporated", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.XOM", "symbol": "XOM", "canonical_venue": "XNYS", "provider_symbol": "XOM", "name": "Exxon Mobil Corporation", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.JNJ", "symbol": "JNJ", "canonical_venue": "XNYS", "provider_symbol": "JNJ", "name": "Johnson & Johnson", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.WMT", "symbol": "WMT", "canonical_venue": "XNYS", "provider_symbol": "WMT", "name": "Walmart Inc.", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.KO", "symbol": "KO", "canonical_venue": "XNYS", "provider_symbol": "KO", "name": "The Coca-Cola Company", "status": "listed", "currency": "USD", "timezone": "America/New_York"}
+  ]
+}

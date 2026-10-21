@@ -1,0 +1,14 @@
+[Unit]
+Description=QuantStack A-share daily incremental worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/quantstack/daily-worker.env
+ExecStart=/usr/bin/env PYTHONPATH=${QUANTSTACK_DAILY_REPO}/src:${QUANTSTACK_DAILY_REPO} ${QUANTSTACK_DAILY_PYTHON} ${QUANTSTACK_DAILY_REPO}/scripts/run_daily_incremental.py --config ${QUANTSTACK_DAILY_CONFIG}
+ExecStartPost=/usr/bin/systemctl --user start --no-block quantstack-cn-qfq-promotion.service
+Nice=10
+
+[Install]
+WantedBy=default.target

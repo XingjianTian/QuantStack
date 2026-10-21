@@ -1,0 +1,14 @@
+{
+  "fixture_kind": "documentation_contract_sample",
+  "provider": "akshare",
+  "provider_version": "1.18.81",
+  "endpoint": "stock_zh_a_hist",
+  "upstream_source": "Eastmoney",
+  "request_parameters": {"symbol": "600000", "period": "daily", "adjust": ""},
+  "volume_unit": "lot",
+  "volume_multiplier_to_shares": 100,
+  "amount_unit": "CNY",
+  "price_adjustment": "unadjusted",
+  "source_documentation": "https://akshare.akfamily.xyz/data/stock/stock.html",
+  "native_record": {"日期": "2026-07-28", "股票代码": "600000", "成交量": 1234}
+}

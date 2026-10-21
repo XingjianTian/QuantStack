@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/daily-r8-preflight/v1",
+  "title": "QuantStack Isolated R8 No-write Preflight",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "isolation_root", "candidate_id", "checks", "side_effects", "consumer_matrix"],
+  "properties": {
+    "schema_version": {"const": "quantstack.daily-r8-preflight.v1"},
+    "status": {"enum": ["gate_review_ready", "blocked"]},
+    "isolation_root": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "detail"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "status": {"enum": ["pass", "fail", "not_verified"]},
+          "detail": {"type": "string"}
+        }
+      }
+    },
+    "side_effects": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "consumer_matrix": {"type": "array", "items": {"type": "object"}}
+  }
+}

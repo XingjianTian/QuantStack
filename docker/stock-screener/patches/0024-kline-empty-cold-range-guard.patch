@@ -1,0 +1,44 @@
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -617,16 +617,19 @@ function CandlestickChart({
+     ) {
+       // Deep daily reads preload enough history for immediate panning while
+       // retaining a stable TradingView-like candle width at the latest edge.
+-      isFirstDataLoadRef.current = false;
+-      fitTimeframeWhenSettledRef.current = false;
+       if (loadsDeepDailyHistory) {
+         const candleCount = chartData.candlesticks.length;
++        if (candleCount === 0) return;
++        isFirstDataLoadRef.current = false;
++        fitTimeframeWhenSettledRef.current = false;
+         const visibleBars = Math.min(INTERACTIVE_DAILY_VISIBLE_BARS, candleCount);
+         chartRef.current.timeScale().setVisibleLogicalRange({
+           from: candleCount - visibleBars,
+           to: candleCount - 1,
+         });
+       } else {
++        isFirstDataLoadRef.current = false;
++        fitTimeframeWhenSettledRef.current = false;
+         chartRef.current.timeScale().fitContent();
+       }
+     } else if (shiftedRangeAfterUpdate) {
+--- a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -109,6 +109,17 @@ describe('CandlestickChart streaming history', () => {
+     expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledWith({ from: 0, to: 1 });
+   });
+ 
++  it('does not set an invalid logical range while the cold request is still empty', async () => {
++    chartHarness.fetchHistory.mockImplementation(() => new Promise(() => {}));
++
++    renderChart();
++
++    await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
++    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '10y');
++    expect(chartHarness.setVisibleLogicalRange).not.toHaveBeenCalled();
++    expect(chartHarness.fitContent).not.toHaveBeenCalled();
++  });
++
+   it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
+     let resolveRange;
+     chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {

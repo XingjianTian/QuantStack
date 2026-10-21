@@ -1,0 +1,14 @@
+ARG BASE_IMAGE=personal/quant-stack-api:0.4.0
+FROM ${BASE_IMAGE}
+
+USER root
+COPY --chown=quant:quant src /app/src
+COPY --chown=quant:quant configs /app/configs
+COPY --chown=quant:quant schemas /app/schemas
+COPY --chown=quant:quant strategies /app/strategies
+COPY --chown=quant:quant datasets/catalog /app/datasets/catalog
+COPY --chown=quant:quant pyproject.toml uv.lock README.md VERSION_LOCK.json /app/
+USER quant
+
+LABEL org.opencontainers.image.version="0.5.1" \
+      io.sudox.quant.release="remove-empty-research-workspace"

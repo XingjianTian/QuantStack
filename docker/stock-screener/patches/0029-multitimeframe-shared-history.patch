@@ -1,0 +1,327 @@
+diff --git a/src/components/Charts/CandlestickChart.jsx b/src/components/Charts/CandlestickChart.jsx
+index 7ffebe1..83864d4 100644
+--- a/src/components/Charts/CandlestickChart.jsx
++++ b/src/components/Charts/CandlestickChart.jsx
+@@ -12,6 +12,7 @@ import {
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
++  historyPageIsExhausted,
+   historyPrefetchBarsForRange,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+@@ -20,6 +21,7 @@ import {
+   shouldPrefetchOlderHistory,
+   shiftedLogicalRangeAfterPrepend,
+   usesBundledPriceData,
++  visibleBarsForTimeframe,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+
+@@ -37,7 +39,6 @@ const debounce = (fn, ms) => {
+ };
+
+ const INTERACTIVE_DAILY_HISTORY_PERIOD = '2y';
+-const INTERACTIVE_DAILY_VISIBLE_BARS = 130;
+
+ /**
+  * TradingView-style candlestick chart component
+@@ -95,6 +96,7 @@ function CandlestickChart({
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(() => defaultShowRsLine(symbol)); // RS line overlay toggle
+   const [olderDailyData, setOlderDailyData] = useState([]);
++  const [historyState, setHistoryState] = useState('idle');
+   const [legendData, setLegendData] = useState(null); // OHLC legend data on hover
+   const [rsBandTop, setRsBandTop] = useState(0.66); // top margin of the live RS band
+   const theme = useTheme();
+@@ -102,11 +104,10 @@ function CandlestickChart({
+
+   const queryClient = useQueryClient();
+   const effectiveTimeframe = hideTimeframeToggle ? 'daily' : timeframe;
+-  const loadsDeepDailyHistory = effectiveTimeframe === 'daily'
+-    && interactive
++  const usesSharedInteractiveHistory = interactive
+     && !compact
+     && !priceData;
+-  const historyPeriod = loadsDeepDailyHistory
++  const historyPeriod = usesSharedInteractiveHistory
+     ? INTERACTIVE_DAILY_HISTORY_PERIOD
+     : (effectiveTimeframe === 'daily'
+       ? period
+@@ -119,6 +120,7 @@ function CandlestickChart({
+     historyExhaustedRef.current = false;
+     historyDemandArmedRef.current = false;
+     historyEagerStartedRef.current = false;
++    setHistoryState('idle');
+   }, [period, symbol]);
+
+   useEffect(() => {
+@@ -153,10 +155,10 @@ function CandlestickChart({
+
+   const baseApiData = useBundledPriceData ? priceData : fetchedApiData;
+   const apiData = useMemo(() => (
+-    effectiveTimeframe === 'daily'
++    usesSharedInteractiveHistory || effectiveTimeframe === 'daily'
+       ? mergePriceHistory(olderDailyData, baseApiData || [])
+       : baseApiData
+-  ), [baseApiData, effectiveTimeframe, olderDailyData]);
++  ), [baseApiData, effectiveTimeframe, olderDailyData, usesSharedInteractiveHistory]);
+   const priceRequestSettled = useBundledPriceData || (!isFetching && dataUpdatedAt > 0);
+
+   // Live RS line + blue-dot dates (interactive surfaces only). Static charts
+@@ -353,13 +355,13 @@ function CandlestickChart({
+         pinch: true,
+       } : false,
+       kineticScroll: interactive ? { mouse: true, touch: true } : { mouse: false, touch: false },
+-      timeScale: { fixLeftEdge: false, fixRightEdge: true },
++      timeScale: { fixLeftEdge: historyState === 'exhausted', fixRightEdge: true },
+     });
+-  }, [interactive]);
++  }, [historyState, interactive]);
+
+   const loadOlderHistory = useCallback(async () => {
+     if (
+-      effectiveTimeframe !== 'daily'
++      !usesSharedInteractiveHistory
+       || historyRequestPendingRef.current
+       || historyExhaustedRef.current
+     ) return;
+@@ -369,6 +371,7 @@ function CandlestickChart({
+     if (!range) return;
+
+     historyRequestPendingRef.current = true;
++    setHistoryState('loading');
+     try {
+       const points = await queryClient.fetchQuery({
+         queryKey: priceHistoryKeys.range(symbol, range.start, range.end),
+@@ -381,19 +384,25 @@ function CandlestickChart({
+         staleTime: PRICE_HISTORY_STALE_TIME,
+         retry: false,
+       });
++      const exhausted = historyPageIsExhausted(points, range);
++      historyExhaustedRef.current = exhausted;
+       if (!Array.isArray(points) || points.length === 0) {
+-        historyExhaustedRef.current = true;
++        setHistoryState('exhausted');
+         return;
+       }
+       setOlderDailyData((current) => mergePriceHistory(current, points));
++      setHistoryState(exhausted ? 'exhausted' : 'ready');
+     } catch (historyError) {
+       if (historyError?.response?.status === 404) {
+         historyExhaustedRef.current = true;
++        setHistoryState('exhausted');
++      } else {
++        setHistoryState('failed');
+       }
+     } finally {
+       historyRequestPendingRef.current = false;
+     }
+-  }, [apiData, effectiveTimeframe, queryClient, symbol]);
++  }, [apiData, queryClient, symbol, usesSharedInteractiveHistory]);
+
+   // Paint from a two-year foreground window, then start the ten-year
+   // predecessor read as soon as that payload is visible. Two years leaves
+@@ -403,8 +412,7 @@ function CandlestickChart({
+     if (
+       compact
+       || !interactive
+-      || useBundledPriceData
+-      || effectiveTimeframe !== 'daily'
++      || !usesSharedInteractiveHistory
+       || !priceRequestSettled
+       || !Array.isArray(baseApiData)
+       || baseApiData.length === 0
+@@ -415,11 +423,10 @@ function CandlestickChart({
+   }, [
+     baseApiData,
+     compact,
+-    effectiveTimeframe,
+     interactive,
+     loadOlderHistory,
+     priceRequestSettled,
+-    useBundledPriceData,
++    usesSharedInteractiveHistory,
+   ]);
+
+   // Match the main-market chart's datafeed semantics: let Lightweight Charts
+@@ -614,14 +621,15 @@ function CandlestickChart({
+       isFirstDataLoadRef.current
+       || (fitTimeframeWhenSettledRef.current && !effectiveIsFetching)
+     ) {
+-      // Deep daily reads preload enough history for immediate panning while
+-      // retaining a stable TradingView-like candle width at the latest edge.
+-      if (loadsDeepDailyHistory) {
++      // Every interactive timeframe projects the same daily source. Establish
++      // its initial right-edge span once; later predecessor merges only shift
++      // logical indices and never alter candle width.
++      if (usesSharedInteractiveHistory) {
+         const candleCount = chartData.candlesticks.length;
+         if (candleCount === 0) return;
+         isFirstDataLoadRef.current = false;
+         fitTimeframeWhenSettledRef.current = false;
+-        const visibleBars = Math.min(INTERACTIVE_DAILY_VISIBLE_BARS, candleCount);
++        const visibleBars = visibleBarsForTimeframe(effectiveTimeframe, candleCount);
+         chartRef.current.timeScale().setVisibleLogicalRange({
+           from: candleCount - visibleBars,
+           to: candleCount - 1,
+@@ -641,7 +649,7 @@ function CandlestickChart({
+       }, 0);
+     }
+     // Otherwise, don't touch the zoom - let user adjust freely
+-  }, [chartData, effectiveIsFetching, effectiveTimeframe, loadsDeepDailyHistory, visibleRange]);
++  }, [chartData, effectiveIsFetching, effectiveTimeframe, usesSharedInteractiveHistory, visibleRange]);
+
+   // Update the RS line overlay + blue-dot markers.
+   // Only rendered on the full daily view; the five-day preset intentionally
+@@ -859,6 +867,7 @@ function CandlestickChart({
+       <div
+         ref={chartContainerRef}
+         data-testid="candlestick-chart-canvas"
++        data-history-state={historyState}
+         style={{
+           width: '100%',
+           height: '100%',
+diff --git a/src/components/Charts/CandlestickChart.streaming.test.jsx b/src/components/Charts/CandlestickChart.streaming.test.jsx
+index d87fcd9..c44edc7 100644
+--- a/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -120,6 +120,43 @@ describe('CandlestickChart streaming history', () => {
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+   });
+
++  it('shares the two requests across every interactive timeframe', async () => {
++    let resolveRange;
++    chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
++      resolveRange = resolve;
++    }));
++    renderChart();
++
++    await screen.findByText('12.00');
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    for (const label of ['Weekly K', 'Monthly K', 'Quarterly K', 'Yearly K', 'Daily K']) {
++      fireEvent.click(screen.getByRole('button', { name: label }));
++    }
++
++    expect(chartHarness.fetchHistory).toHaveBeenCalledTimes(1);
++    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++
++    resolveRange([
++      { date: '2025-01-02', open: 8, high: 10, low: 7, close: 9, volume: 80 },
++    ]);
++    await waitFor(() => expect(
++      screen.getByTestId('candlestick-chart-canvas'),
++    ).toHaveAttribute('data-history-state', 'exhausted'));
++  });
++
++  it('locks an exhausted shared history edge for non-daily timeframes', async () => {
++    chartHarness.fetchRange.mockResolvedValue([]);
++    renderChart();
++
++    await waitFor(() => expect(
++      screen.getByTestId('candlestick-chart-canvas'),
++    ).toHaveAttribute('data-history-state', 'exhausted'));
++    fireEvent.click(screen.getByRole('button', { name: 'Weekly K' }));
++    chartHarness.logicalRangeHandler({ from: -20, to: 40 });
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++  });
++
+   it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
+     let resolveRange;
+     chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+diff --git a/src/components/Charts/chartTimeframes.js b/src/components/Charts/chartTimeframes.js
+index 2b2af91..1640021 100644
+--- a/src/components/Charts/chartTimeframes.js
++++ b/src/components/Charts/chartTimeframes.js
+@@ -24,6 +24,21 @@ export const chartPinchZoomDirection = (event) => {
+
+ export const STREAMING_HISTORY_PAGE_DAYS = 3650;
+ export const STREAMING_HISTORY_PREFETCH_BARS = 50;
++const HISTORY_START_GAP_TOLERANCE_DAYS = 31;
++
++const TIMEFRAME_VISIBLE_BARS = {
++  'five-day': 5,
++  daily: 130,
++  weekly: 130,
++  monthly: 120,
++  quarterly: 40,
++  yearly: 10,
++};
++
++export const visibleBarsForTimeframe = (timeframe, candleCount) => {
++  if (!Number.isInteger(candleCount) || candleCount < 1) return 0;
++  return Math.min(TIMEFRAME_VISIBLE_BARS[timeframe] ?? TIMEFRAME_VISIBLE_BARS.daily, candleCount);
++};
+
+ export const historyPrefetchBarsForRange = (
+   range,
+@@ -56,6 +71,25 @@ export const previousHistoryPage = (
+   return { start: format(start), end: format(end) };
+ };
+
++export const historyPageIsExhausted = (
++  points,
++  range,
++  gapToleranceDays = HISTORY_START_GAP_TOLERANCE_DAYS,
++) => {
++  if (!Array.isArray(points) || points.length === 0) return true;
++  if (!range?.start || !Number.isFinite(gapToleranceDays) || gapToleranceDays < 0) return false;
++  const firstKey = points
++    .map((point) => point?.time ?? point?.date)
++    .filter(Boolean)
++    .map(String)
++    .sort()[0];
++  const requestedStart = new Date(`${range.start}T00:00:00Z`);
++  const returnedStart = new Date(`${firstKey}T00:00:00Z`);
++  if (Number.isNaN(requestedStart.getTime()) || Number.isNaN(returnedStart.getTime())) return false;
++  const gapDays = (returnedStart.getTime() - requestedStart.getTime()) / 86_400_000;
++  return gapDays > gapToleranceDays;
++};
++
+ export const shouldPrefetchOlderHistory = (
+   barsInfo,
+   {
+diff --git a/src/components/Charts/chartTimeframes.test.js b/src/components/Charts/chartTimeframes.test.js
+index 33c870d..83ac11b 100644
+--- a/src/components/Charts/chartTimeframes.test.js
++++ b/src/components/Charts/chartTimeframes.test.js
+@@ -4,6 +4,7 @@ import {
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
++  historyPageIsExhausted,
+   historyPrefetchBarsForRange,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+@@ -12,6 +13,7 @@ import {
+   shouldPrefetchOlderHistory,
+   shiftedLogicalRangeAfterPrepend,
+   usesBundledPriceData,
++  visibleBarsForTimeframe,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+
+@@ -50,6 +52,22 @@ describe('chart timeframe controls', () => {
+     });
+   });
+
++  it('uses stable right-edge spans for every timeframe', () => {
++    expect(visibleBarsForTimeframe('daily', 500)).toBe(130);
++    expect(visibleBarsForTimeframe('weekly', 500)).toBe(130);
++    expect(visibleBarsForTimeframe('monthly', 500)).toBe(120);
++    expect(visibleBarsForTimeframe('quarterly', 500)).toBe(40);
++    expect(visibleBarsForTimeframe('yearly', 500)).toBe(10);
++    expect(visibleBarsForTimeframe('weekly', 80)).toBe(80);
++  });
++
++  it('marks a partial authoritative range or empty page as exhausted', () => {
++    const range = { start: '2016-03-03', end: '2026-02-28' };
++    expect(historyPageIsExhausted([], range)).toBe(true);
++    expect(historyPageIsExhausted([{ date: '2016-03-07' }], range)).toBe(false);
++    expect(historyPageIsExhausted([{ date: '2018-01-02' }], range)).toBe(true);
++  });
++
+   it('keeps at least one viewport of history prefetched', () => {
+     expect(historyPrefetchBarsForRange({ from: -20, to: 160 })).toBe(225);
+     expect(historyPrefetchBarsForRange(null)).toBe(50);

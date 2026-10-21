@@ -1,0 +1,21 @@
+FROM ghcr.io/astral-sh/uv:0.9.28@sha256:59240a65d6b57e6c507429b45f01b8f2c7c0bbeee0fb697c41a39c6a8e3a4cfb AS uv
+FROM python:3.12-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b
+COPY --from=uv /uv /bin/uv
+WORKDIR /app
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY tests/fixtures/brokerage ./tests/fixtures/brokerage
+RUN uv sync --frozen --no-dev --extra brokerage \
+    && useradd --create-home --shell /usr/sbin/nologin quant \
+    && mkdir -p /sample-state \
+    && chown quant:quant /sample-state \
+    && chmod 0700 /sample-state
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONPATH="/app/src:/app" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    QUANT_SAMPLE_RUNTIME_ROOT=/sample-state
+USER quant
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8917/v1/brokerage-sample/state')" || exit 1
+CMD ["python", "-m", "quant_stack.brokerage_sample_api"]

@@ -1,0 +1,17 @@
+{
+  "fixture_kind": "offline_provider_replay",
+  "provider": "baostock",
+  "endpoint": "query_history_k_data_plus",
+  "volume_unit": "share",
+  "price_adjustment": "unadjusted",
+  "records": [
+    {"date": "2026-07-27", "code": "sh.600000", "open": "10.00", "high": "10.30", "low": "9.90", "close": "10.20", "volume": "1250000", "amount": "12650000", "adjustflag": "3"},
+    {"date": "2026-07-28", "code": "sh.600000", "open": "10.20", "high": "10.40", "low": "10.10", "close": "10.35", "volume": "1320000", "amount": "13620000", "adjustflag": "3"},
+    {"date": "2026-07-27", "code": "sz.000001", "open": "12.00", "high": "12.25", "low": "11.90", "close": "12.10", "volume": "2100000", "amount": "25300000", "adjustflag": "3"},
+    {"date": "2026-07-28", "code": "sz.000001", "open": "12.10", "high": "12.20", "low": "11.95", "close": "12.00", "volume": "1980000", "amount": "23800000", "adjustflag": "3"},
+    {"date": "2026-07-28", "code": "sh.688001", "open": "20.00", "high": "20.40", "low": "19.80", "close": "20.10", "volume": "600000", "amount": "12060000", "adjustflag": "3"},
+    {"date": "2026-07-28", "code": "sz.300001", "open": "8.00", "high": "8.20", "low": "7.90", "close": "8.10", "volume": "900000", "amount": "7290000", "adjustflag": "3"},
+    {"date": "2026-07-28", "code": "sh.600001", "open": "5.00", "high": "5.00", "low": "5.00", "close": "5.00", "volume": "0", "amount": "0", "adjustflag": "3"},
+    {"date": "2002-09-20", "code": "sz.000003", "open": "3.20", "high": "3.25", "low": "3.10", "close": "3.15", "volume": "120000", "amount": "380000", "adjustflag": "3"}
+  ]
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>登录 · QuantStack 量子栈</title>
+    <link rel="stylesheet" href="/login.css">
+  </head>
+  <body>
+    <main class="auth-shell">
+      <section class="auth-intro" aria-labelledby="auth-title">
+        <p class="eyebrow">QuantStack 量子栈</p>
+        <h1 id="auth-title">统一登录</h1>
+        <p class="destination">继续访问 <strong id="service-name">受保护服务</strong></p>
+        <p class="security-note">会话仅用于本平台受保护界面，八小时后自动失效。</p>
+      </section>
+
+      <form id="login-form" class="auth-form" autocomplete="on">
+        <label for="username">账号</label>
+        <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+
+        <label for="password">密码</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+        <button id="submit-button" type="submit">登录并继续</button>
+      </form>
+    </main>
+    <script src="/login.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN" data-ark-theme="endfield" data-ark-depth="maximal" data-scene="overview">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quant Center · Endfield Maximal Preview</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./endfield.css" />
+</head>
+<body>
+  <div class="load-wipe" aria-hidden="true"></div>
+  <nav class="platform-nav" aria-label="Quant Platform 统一导航">
+    <a class="platform-brand" href="#overview">Quant Platform</a>
+    <div class="platform-links">
+      <a class="active" href="#overview">量化中心</a><a href="#vt">AI 投研（VT）</a><a href="#screener">Stock-Screener</a><a href="#nautilus">Nautilus 研究台</a>
+    </div>
+    <span class="platform-mode">PREVIEW / 01</span>
+  </nav>
+
+  <div class="shell">
+    <aside class="rail">
+      <div class="rail-brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><b>QC</b></div>
+      <button class="mobile-menu" data-menu-button aria-expanded="false" aria-controls="rail-nav">MENU</button>
+      <nav id="rail-nav" class="rail-nav" aria-label="量化中心导航">
+        <a href="#overview" aria-current="page"><span>01</span><b>总览</b></a>
+        <a href="#strategy"><span>02</span><b>策略</b></a>
+        <a href="#experiment"><span>03</span><b>实验</b></a>
+        <a href="#data"><span>04</span><b>数据</b></a>
+        <a href="#services"><span>05</span><b>服务</b></a>
+      </nav>
+      <div class="rail-foot"><span class="state-dot"></span><span>研究模式</span><small>LIVE TRADING<br />DISABLED</small></div>
+    </aside>
+
+    <main class="stage">
+      <header class="utility-bar">
+        <div><span>PERSONAL QUANT PLATFORM</span><b>研究基础设施调度台</b></div>
+        <div class="utility-state"><span>DATA ROOT</span><b>NAS 已挂载</b><i></i></div>
+        <button type="button">⌘ K&nbsp;&nbsp;全局搜索</button>
+      </header>
+
+      <section class="field-stage" aria-live="polite">
+        <div class="grid" aria-hidden="true"></div>
+        <div class="sector" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="edge-scale" aria-hidden="true"></div>
+        <div class="scene-number" aria-hidden="true">01</div>
+
+        <div class="scene-tabs" role="tablist" aria-label="预览场景">
+          <button role="tab" data-scene-button="overview" aria-selected="true"><span>01</span>总览</button>
+          <button role="tab" data-scene-button="data" aria-selected="false"><span>02</span>数据链路</button>
+          <button role="tab" data-scene-button="experiment" aria-selected="false"><span>03</span>实验生命周期</button>
+        </div>
+
+        <article class="scene-copy" data-scene-panel="overview">
+          <p class="kicker">FIELD CONTROL / RESEARCH FIRST</p>
+          <h1>今天从<br /><em>研究</em>开始。</h1>
+          <p class="summary">把市场观察、AI 投研、策略规格与可复现实验，组织成一条长期可维护的工作流。</p>
+          <a class="primary-action" href="#vt"><span>打开 AI 研究助手</span><b>→</b></a>
+        </article>
+        <article class="scene-copy" data-scene-panel="data" hidden>
+          <p class="kicker">DATA PLANE / VERSIONED</p>
+          <h1>数据先<br /><em>可追溯</em>。</h1>
+          <p class="summary">Git 保存元数据，NAS 保存行情、财务、文本、因子和回测结果；研究只通过版本清单读取。</p>
+          <a class="primary-action" href="#data"><span>进入数据目录</span><b>→</b></a>
+        </article>
+        <article class="scene-copy" data-scene-panel="experiment" hidden>
+          <p class="kicker">EXPERIMENT LOOP / REPRODUCIBLE</p>
+          <h1>每次验证<br /><em>都有记录</em>。</h1>
+          <p class="summary">代码提交、数据版本、参数配置、引擎版本与报告共同构成一次可复现实验。</p>
+          <a class="primary-action" href="#experiment"><span>查看实验记录</span><b>→</b></a>
+        </article>
+
+        <div class="route-matrix" aria-label="研究工作流">
+          <div class="matrix-head"><span>RESEARCH ROUTE</span><b>04 / 04</b></div>
+          <ol>
+            <li class="done"><span>01</span><b>市场观察</b><small>Stock-Screener</small></li>
+            <li class="active"><span>02</span><b>形成假设</b><small>Vibe-Trading</small></li>
+            <li><span>03</span><b>冻结规格</b><small>strategy_spec.yaml</small></li>
+            <li><span>04</span><b>回测验证</b><small>NautilusTrader</small></li>
+          </ol>
+          <div class="matrix-safety"><i></i><span><b>安全边界生效</b><small>无模拟盘 / 无实盘入口</small></span></div>
+        </div>
+      </section>
+
+      <section class="action-dock" aria-label="核心工作入口">
+        <a href="#screener"><span class="dock-index">A / 01</span><b>发现标的</b><small>选股、分时、市场宽度</small><i>↗</i></a>
+        <a href="#vt"><span class="dock-index">A / 02</span><b>AI 投研</b><small>探索、因子、研究报告</small><i>↗</i></a>
+        <a href="#strategy"><span class="dock-index">A / 03</span><b>策略规格</b><small>统一接口与生命周期</small><i>→</i></a>
+        <a href="#nautilus"><span class="dock-index">A / 04</span><b>回测验证</b><small>事件驱动研究引擎</small><i>↗</i></a>
+      </section>
+    </main>
+  </div>
+  <script src="./preview.js"></script>
+</body>
+</html>

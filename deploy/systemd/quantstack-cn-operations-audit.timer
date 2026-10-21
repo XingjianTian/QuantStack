@@ -1,0 +1,12 @@
+[Unit]
+Description=Run QuantStack A-share operations audit after the daily worker
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 20:30:00 Asia/Shanghai
+OnCalendar=Fri *-*-* 22:30:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=0
+Unit=quantstack-cn-operations-audit.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,53 @@
+schema_version: 1.0.0
+strategy_id: sma_cross_demo
+name: SMA Cross Demonstration
+version: 0.1.0
+owner: personal-quant-stack
+status: research
+thesis: A slow trend filter may identify persistent daily price regimes; this is a plumbing example, not an investment recommendation.
+market_scope:
+  regions: [US]
+  asset_classes: [etf]
+  venues: [ARCA]
+  instruments: [SPY]
+  currency: USD
+data_requirements:
+  - dataset_id: us_equity_daily_sample
+    kind: market_bars
+    frequency: 1d
+    fields: [open, high, low, close, volume]
+    point_in_time: true
+signal_sources:
+  - Adjusted close SMA(20) crossing SMA(100), computed after the session close.
+entry_rules:
+  - description: Enter long when fast SMA crosses above slow SMA.
+    expression: sma_20[t] > sma_100[t] and sma_20[t-1] <= sma_100[t-1]
+    execution_timing: next_bar_open
+exit_rules:
+  - description: Exit when fast SMA crosses below slow SMA.
+    expression: sma_20[t] < sma_100[t] and sma_20[t-1] >= sma_100[t-1]
+    execution_timing: next_bar_open
+position_rules:
+  method: fixed_fraction
+  max_position_pct: 0.25
+  max_gross_exposure: 0.25
+  rebalance: on_signal
+risk_limits:
+  max_drawdown_pct: 0.15
+  max_daily_loss_pct: 0.02
+  max_positions: 1
+  stop_loss_pct: 0.08
+  kill_switch_required: true
+backtest:
+  engine: nautilus_trader
+  start: "2020-01-01"
+  end: "2025-12-31"
+  initial_capital: 100000
+  base_currency: USD
+  commission_bps: 2.0
+  slippage_bps: 5.0
+  benchmark: SPY
+implementation:
+  adapter: adapters.nautilus.spec_bridge
+  class: SmaCrossStrategy
+tags: [example, trend]

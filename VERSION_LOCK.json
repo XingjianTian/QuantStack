@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "captured_at": "2026-07-29T10:55:00+08:00",
+  "applications": {
+    "quant_stack_api": "0.5.1",
+    "quant_center_web": "0.9.14",
+    "quant_brokerage_sample": "0.1.0",
+    "vibe_trading_quant_image": "0.7.0",
+    "nautilus_lab_web": "0.4.0",
+    "stock_screener_frontend_patch": "1.4.0-name-first.35",
+    "stock_screener_localization": "1.4.0-zh.59",
+    "stock_screener_quantstack_consumer_adapter": "1.7.6",
+    "stock_screener_celery_slimming": "1.4.0-celery-slim.2",
+    "stock_screener_runtime_recovery": "1.4.0-quant-runtime.16",
+    "ss_legacy_converter": "1.0.2",
+    "ss_legacy_conversion_manifest_schema": "1.2.0"
+  },
+  "upstreams": {
+    "nautilus_trader": {
+      "repository": "https://github.com/nautechsystems/nautilus_trader.git",
+      "source_branch": "develop",
+      "local_branch": "local/main",
+      "commit": "7d2c7058dc9283a8ce349e3f580436c52e76ba6e",
+      "source_version": "1.231.0",
+      "nearest_merged_release_tag": "v1.215.0",
+      "installable_integration_version": "1.215.0"
+    },
+    "vibe_trading": {
+      "repository": "https://github.com/HKUDS/Vibe-Trading.git",
+      "source_branch": "main",
+      "local_branch": "local/main",
+      "commit": "d8d22a70f702da85aa55a6e920c2db89ae58dfa8",
+      "source_version": "0.1.12",
+      "nearest_merged_release_tag": "v0.1.12"
+    },
+    "stock_screener": {
+      "repository": "https://github.com/xang1234/stock-screener.git",
+      "source_tag": "v1.4.0",
+      "tag_object": "5bdb8ab418093b164caa24f714d62ea34c2e976d",
+      "local_branch": "local/v1.4.0",
+      "commit": "da4d01a83e420ac9c148ff4fe0260ee1e4228885",
+      "source_version": "1.4.0"
+    }
+  },
+  "toolchain": {
+    "python": "3.12",
+    "uv": "0.9.28",
+    "rust": "1.93.0",
+    "docker": "29.1.3",
+    "docker_compose": "5.0.1"
+  },
+  "container_images": {
+    "uv": "ghcr.io/astral-sh/uv:0.9.28@sha256:59240a65d6b57e6c507429b45f01b8f2c7c0bbeee0fb697c41a39c6a8e3a4cfb",
+    "python": "python:3.12-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b",
+    "node": "node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2",
+    "nginx": "nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+    "stock_screener_backend": "ghcr.io/xang1234/stockscreenclaude-backend:v1.4.0@sha256:039a80cd1e92fe744a20a829aaa74ef6d43c4c2ad57e0020be787c15e439df06",
+    "stock_screener_backend_linux_amd64": "sha256:25ba467fe46d1b39f37fe13da6c583574f6f2d218c3bd71a5e7e616d2afb3718",
+    "stock_screener_backend_downstream": "personal/stock-screener-backend-downstream:1.4.0-quant-runtime.16 (upstream v1.4.0 backend image plus QuantStack scheduling, request-correlated exact-version local read path, local index cards, explicit foreground-priority range history, process-bootstrapped versioned atomic scan analytics, one-statement durable cache-independent Daily Snapshot publications, and metadata-only cold-plan warmup)",
+    "stock_screener_frontend": "ghcr.io/xang1234/stockscreenclaude-frontend:v1.4.0@sha256:b738f2c18172b9c12d53e13ff92bf38f59145ec1154d9cc5a6fa98c4a4f1c23b",
+    "stock_screener_frontend_linux_amd64": "sha256:78cf7969e5cb266233460e65b2f178a060e93252a45e9faacada547a10f4c988",
+    "stock_screener_frontend_downstream": "personal/stock-screener-frontend-downstream:1.4.0-name-first.35 (upstream commit da4d01a83e420ac9c148ff4fe0260ee1e4228885 plus patches 0001-0034)",
+    "stock_screener_frontend_zh": "personal/stock-screener-frontend-zh:1.4.0-zh.59 (derived locally from the downstream frontend image)"
+  },
+  "notes": [
+    "Upstream repositories use partial-clone blob filtering but retain their commit graph.",
+    "NautilusTrader develop reports 1.231.0 while its latest merged release tag is v1.215.0; the exact commit is authoritative.",
+    "Container base-image digests were resolved and pinned during the initial build.",
+    "Stock Screener v1.4.0 is an annotated tag; its tag object and peeled code commit are both recorded.",
+    "Stock Screener is initially deployed as an isolated CN-only research workspace; it is not an execution engine.",
+    "Stock Screener source changes are stored as numbered patches and built on the locked upstream commit without rewriting upstream history.",
+    "The name-first.N suffix versions the downstream source patch; zh.N versions only the Chinese UI overlay. Neither changes the Stock Screener upstream version."
+  ]
+}

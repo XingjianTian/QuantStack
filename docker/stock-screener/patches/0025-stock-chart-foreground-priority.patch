@@ -1,0 +1,138 @@
+--- a/frontend/src/components/Stock/StockDetails.jsx
++++ b/frontend/src/components/Stock/StockDetails.jsx
+@@ -139,7 +139,13 @@ function InfoBox({ label, value }) {
+   );
+ }
+ 
+-function StockChartWorkspace({ symbol, stockData = null, fundamentals = null, onViewPeers }) {
++function StockChartWorkspace({
++  symbol,
++  stockData = null,
++  fundamentals = null,
++  onViewPeers,
++  onDataReady,
++}) {
+   return (
+     <Box sx={{ display: 'flex', borderBottom: 1, borderColor: 'divider', height: 520 }}>
+       <StockMetricsSidebar
+@@ -153,6 +159,7 @@ function StockChartWorkspace({ symbol, stockData = null, fundamentals = null, on
+           symbol={symbol}
+           period="6mo"
+           height={520}
++          onDataReady={onDataReady}
+         />
+       </Box>
+     </Box>
+@@ -169,11 +176,13 @@ function StockDetails() {
+   } = useStrategyProfileData();
+   const [peerModalOpen, setPeerModalOpen] = useState(false);
+   const [validationLookbackDays, setValidationLookbackDays] = useState(365);
++  const [chartReadySymbol, setChartReadySymbol] = useState(null);
++  const chartReady = chartReadySymbol === symbol;
+ 
+   const { data, isLoading, error } = useQuery({
+     queryKey: ['stockDecisionDashboard', symbol, requestProfile],
+     queryFn: () => getStockDecisionDashboard(symbol, requestProfile),
+-    enabled: Boolean(symbol && requestProfile),
++    enabled: Boolean(symbol && requestProfile && chartReady),
+     staleTime: 60_000,
+   });
+   const {
+@@ -183,7 +192,7 @@ function StockDetails() {
+   } = useQuery({
+     queryKey: ['stockValidation', symbol, validationLookbackDays],
+     queryFn: () => getStockValidation(symbol, validationLookbackDays),
+-    enabled: Boolean(symbol),
++    enabled: Boolean(symbol && chartReady),
+     staleTime: 60_000,
+   });
+ 
+@@ -192,7 +201,7 @@ function StockDetails() {
+     [data]
+   );
+ 
+-  if (isLoading || (isLoadingProfiles && !requestProfile)) {
++  if (!chartReady || isLoading || (isLoadingProfiles && !requestProfile)) {
+     return (
+       <Box>
+         <Box
+@@ -210,7 +219,10 @@ function StockDetails() {
+           <Typography variant="h5" fontWeight="bold">{symbol}</Typography>
+           <CircularProgress size={20} aria-label="Loading stock analysis" />
+         </Box>
+-        <StockChartWorkspace symbol={symbol} />
++        <StockChartWorkspace
++          symbol={symbol}
++          onDataReady={setChartReadySymbol}
++        />
+       </Box>
+     );
+   }
+@@ -363,6 +375,7 @@ function StockDetails() {
+         stockData={(data.chart?.chart_data?.source !== 'unavailable' && data.chart?.chart_data) || null}
+         fundamentals={sidebarFundamentals}
+         onViewPeers={() => setPeerModalOpen(true)}
++        onDataReady={setChartReadySymbol}
+       />
+ 
+       {/* ─── Accordion Sections ─── */}
+--- a/frontend/src/components/Stock/StockDetails.test.jsx
++++ b/frontend/src/components/Stock/StockDetails.test.jsx
+@@ -1,5 +1,6 @@
++import { useEffect } from 'react';
+ import { MemoryRouter, Route, Routes } from 'react-router-dom';
+-import { screen } from '@testing-library/react';
++import { act, screen, waitFor } from '@testing-library/react';
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ import { renderWithProviders } from '../../test/renderWithProviders';
+@@ -8,6 +9,7 @@ import StockDetails from './StockDetails';
+ const getStockDecisionDashboard = vi.fn();
+ const getStockValidation = vi.fn();
+ const candlestickChartPropsSpy = vi.fn();
++const chartReadiness = vi.hoisted(() => ({ autoReady: true }));
+ const strategyProfileState = vi.hoisted(() => ({
+   current: {
+     activeProfile: 'default',
+@@ -37,6 +39,10 @@ vi.mock('../../contexts/StrategyProfileContext', () => ({
+ vi.mock('../Charts/CandlestickChart', () => ({
+-  default: (props) => {
++  default: function MockCandlestickChart(props) {
++    const { onDataReady, symbol } = props;
+     candlestickChartPropsSpy(props);
++    useEffect(() => {
++      if (chartReadiness.autoReady) onDataReady?.(symbol);
++    }, [onDataReady, symbol]);
+-    return <div data-testid="candlestick-chart">{props.symbol}</div>;
++    return <div data-testid="candlestick-chart">{symbol}</div>;
+   },
+ }));
+@@ -54,6 +60,7 @@ describe('StockDetails', () => {
+     vi.clearAllMocks();
+     getStockDecisionDashboard.mockReset();
+     getStockValidation.mockReset();
++    chartReadiness.autoReady = true;
+     strategyProfileState.current = {
+       activeProfile: 'default',
+       effectiveProfile: 'default',
+@@ -71,6 +78,7 @@ describe('StockDetails', () => {
+   });
+ 
+   it('mounts the deep-history chart before the decision dashboard resolves', async () => {
++    chartReadiness.autoReady = false;
+     getStockDecisionDashboard.mockReturnValue(new Promise(() => {}));
+     getStockValidation.mockReturnValue(new Promise(() => {}));
+ 
+@@ -89,6 +97,12 @@ describe('StockDetails', () => {
+       period: '6mo',
+     }));
+     expect(candlestickChartPropsSpy.mock.calls.at(-1)?.[0]?.priceData).toBeUndefined();
++    expect(getStockDecisionDashboard).not.toHaveBeenCalled();
++    expect(getStockValidation).not.toHaveBeenCalled();
++
++    act(() => candlestickChartPropsSpy.mock.calls.at(-1)?.[0]?.onDataReady('600519.SS'));
++    await waitFor(() => expect(getStockDecisionDashboard).toHaveBeenCalledWith('600519.SS', 'default'));
++    expect(getStockValidation).toHaveBeenCalledWith('600519.SS', 365);
+   });
+ 
+   it('renders the decision workspace from dashboard payload', async () => {

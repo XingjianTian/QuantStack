@@ -1,0 +1,25 @@
+{
+  "call_shape": "yf.Ticker(symbol).history(period=\"5y\", interval=\"1d\")",
+  "concurrency": 1,
+  "frozen_corpus": [
+    "600000.SS",
+    "600519.SS",
+    "601318.SS",
+    "601398.SS",
+    "000001.SZ",
+    "000333.SZ",
+    "000858.SZ",
+    "002594.SZ"
+  ],
+  "generator": "scripts/generate_public_replay_fixture.py",
+  "interval": "1d",
+  "logical_calls": 8,
+  "normalization_applied": false,
+  "notice": "Version and call-shape fields below are replay compatibility labels, not evidence of a real yfinance acquisition. All OHLCV are generated.",
+  "period": "5y",
+  "provider_calls": 0,
+  "schema_version": "ss.legacy-yfinance-source-provenance.v1",
+  "script_level_retries": 0,
+  "synthetic": true,
+  "yfinance_version": "0.2.66"
+}

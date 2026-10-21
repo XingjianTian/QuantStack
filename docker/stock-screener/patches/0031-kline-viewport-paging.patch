@@ -1,0 +1,373 @@
+diff --git a/src/api/priceHistory.js b/src/api/priceHistory.js
+index 8911aa0..a9325f6 100644
+--- a/src/api/priceHistory.js
++++ b/src/api/priceHistory.js
+@@ -29,11 +29,13 @@ export const fetchPriceHistoryRange = async (symbol, start, end, { signal } = {}
+  * Fetch the RS line (stock / market benchmark) and blue-dot dates for a symbol.
+  * @param {string} symbol - Stock symbol
+  * @param {string} period - Time period (default: '6mo')
++ * @param {{signal?: AbortSignal}} [options] - Optional cancellation options
+  * @returns {Promise<{symbol: string, benchmark_symbol: string, rs_line: Array<{time: string, value: number}>, blue_dots: string[]}>}
+  */
+-export const fetchRSLine = async (symbol, period = '6mo') => {
++export const fetchRSLine = async (symbol, period = '6mo', { signal } = {}) => {
+   const response = await apiClient.get(`/v1/stocks/${symbol}/rs-line`, {
+     params: { period },
++    signal,
+   });
+   return response.data;
+ };
+diff --git a/src/components/Charts/CandlestickChart.jsx b/src/components/Charts/CandlestickChart.jsx
+index cf4e996..5886cda 100644
+--- a/src/components/Charts/CandlestickChart.jsx
++++ b/src/components/Charts/CandlestickChart.jsx
+@@ -39,6 +39,7 @@ const debounce = (fn, ms) => {
+ };
+ 
+ const INTERACTIVE_DAILY_HISTORY_PERIOD = '2y';
++const BACKGROUND_IDLE_DELAY_MS = 1500;
+ 
+ /**
+  * TradingView-style candlestick chart component
+@@ -92,13 +93,13 @@ function CandlestickChart({
+   const historyRequestPendingRef = useRef(false);
+   const historyExhaustedRef = useRef(false);
+   const historyDemandArmedRef = useRef(false);
+-  const historyEagerStartedRef = useRef(false);
+   const appliedCandlesRef = useRef([]);
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(() => defaultShowRsLine(symbol)); // RS line overlay toggle
+   const [olderDailyData, setOlderDailyData] = useState([]);
+   const [historyState, setHistoryState] = useState('idle');
++  const [backgroundReady, setBackgroundReady] = useState(false);
+   const [legendData, setLegendData] = useState(null); // OHLC legend data on hover
+   const [rsBandTop, setRsBandTop] = useState(0.66); // top margin of the live RS band
+   const theme = useTheme();
+@@ -121,7 +122,7 @@ function CandlestickChart({
+     historyRequestPendingRef.current = false;
+     historyExhaustedRef.current = false;
+     historyDemandArmedRef.current = false;
+-    historyEagerStartedRef.current = false;
++    setBackgroundReady(false);
+     setHistoryState('idle');
+   }, [period, symbol]);
+ 
+@@ -167,8 +168,8 @@ function CandlestickChart({
+   // carry the RS payload in their bundle instead, so the query stays disabled.
+   const { data: fetchedRsData } = useQuery({
+     queryKey: priceHistoryKeys.rsLine(symbol, historyPeriod),
+-    queryFn: () => fetchRSLine(symbol, historyPeriod),
+-    enabled: !!symbol && !priceData && !compact && showRSLine && priceRequestSettled
++    queryFn: ({ signal }) => fetchRSLine(symbol, historyPeriod, { signal }),
++    enabled: !!symbol && !priceData && !compact && showRSLine && backgroundReady
+       && Array.isArray(apiData) && apiData.length > 0,
+     staleTime: PRICE_HISTORY_STALE_TIME,
+     keepPreviousData: true,
+@@ -232,14 +233,27 @@ function CandlestickChart({
+     }
+   }, [apiData, onDataReady, priceRequestSettled, symbol]);
+ 
++  // Non-chart reads may start only after the foreground has stayed idle. The
++  // short grace period gives an immediate left-pan a chance to claim the NAS
++  // path before the default US RS overlay or modal prefetch begins.
+   useEffect(() => {
+-    if (
+-      onHistoryReady
+-      && ['ready', 'exhausted', 'failed'].includes(historyState)
+-    ) {
++    const foregroundReady = priceRequestSettled
++      && Array.isArray(apiData)
++      && apiData.length > 0
++      && historyState !== 'loading';
++    if (!foregroundReady) {
++      setBackgroundReady(false);
++      return undefined;
++    }
++    const timer = setTimeout(() => setBackgroundReady(true), BACKGROUND_IDLE_DELAY_MS);
++    return () => clearTimeout(timer);
++  }, [apiData, historyState, priceRequestSettled, symbol]);
++
++  useEffect(() => {
++    if (onHistoryReady && backgroundReady) {
+       onHistoryReady(symbol, historyState);
+     }
+-  }, [historyState, onHistoryReady, symbol]);
++  }, [backgroundReady, historyState, onHistoryReady, symbol]);
+ 
+   // Initialize chart on mount using useLayoutEffect for synchronous DOM access
+   useLayoutEffect(() => {
+@@ -381,9 +395,15 @@ function CandlestickChart({
+     const range = previousHistoryPage(earliest);
+     if (!range) return;
+ 
++    historyDemandArmedRef.current = false;
+     historyRequestPendingRef.current = true;
++    setBackgroundReady(false);
+     setHistoryState('loading');
+     try {
++      await queryClient.cancelQueries({
++        queryKey: priceHistoryKeys.rsLine(symbol, historyPeriod),
++        exact: true,
++      });
+       const points = await queryClient.fetchQuery({
+         queryKey: priceHistoryKeys.range(symbol, range.start, range.end),
+         queryFn: ({ signal }) => fetchPriceHistoryRange(
+@@ -413,32 +433,7 @@ function CandlestickChart({
+     } finally {
+       historyRequestPendingRef.current = false;
+     }
+-  }, [apiData, queryClient, symbol, usesSharedInteractiveHistory]);
+-
+-  // Paint from a two-year foreground window, then start the ten-year
+-  // predecessor read as soon as that payload is visible. Two years leaves
+-  // several viewport widths for immediate panning while avoiding the render
+-  // cost of blocking first paint on thousands of candles.
+-  useEffect(() => {
+-    if (
+-      compact
+-      || !interactive
+-      || !usesSharedInteractiveHistory
+-      || !priceRequestSettled
+-      || !Array.isArray(baseApiData)
+-      || baseApiData.length === 0
+-      || historyEagerStartedRef.current
+-    ) return;
+-    historyEagerStartedRef.current = true;
+-    loadOlderHistory();
+-  }, [
+-    baseApiData,
+-    compact,
+-    interactive,
+-    loadOlderHistory,
+-    priceRequestSettled,
+-    usesSharedInteractiveHistory,
+-  ]);
++  }, [apiData, historyPeriod, queryClient, symbol, usesSharedInteractiveHistory]);
+ 
+   // Match the main-market chart's datafeed semantics: let Lightweight Charts
+   // own pan/drag momentum, then prefetch one older local page before the user
+diff --git a/src/components/Charts/CandlestickChart.streaming.test.jsx b/src/components/Charts/CandlestickChart.streaming.test.jsx
+index 6c8e197..90f58a7 100644
+--- a/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -9,6 +9,7 @@ const chartHarness = vi.hoisted(() => ({
+   logicalRangeHandler: null,
+   fetchHistory: vi.fn(),
+   fetchRange: vi.fn(),
++  fetchRs: vi.fn(),
+   fitContent: vi.fn(),
+   getVisibleLogicalRange: vi.fn(() => ({ from: 0, to: 1 })),
+   setVisibleRange: vi.fn(),
+@@ -18,7 +19,7 @@ const chartHarness = vi.hoisted(() => ({
+ vi.mock('../../api/priceHistory', () => ({
+   fetchPriceHistory: (...args) => chartHarness.fetchHistory(...args),
+   fetchPriceHistoryRange: (...args) => chartHarness.fetchRange(...args),
+-  fetchRSLine: vi.fn(async () => null),
++  fetchRSLine: (...args) => chartHarness.fetchRs(...args),
+   priceHistoryKeys: {
+     symbol: (symbol, period) => ['priceHistory', symbol, period],
+     range: (symbol, start, end) => ['priceHistory', symbol, 'range', start, end],
+@@ -86,6 +87,8 @@ describe('CandlestickChart streaming history', () => {
+       { date: '2026-03-02', open: 11, high: 13, low: 10, close: 12, volume: 120 },
+     ]);
+     chartHarness.fetchRange.mockReset();
++    chartHarness.fetchRs.mockReset();
++    chartHarness.fetchRs.mockResolvedValue(null);
+     chartHarness.fitContent.mockReset();
+     chartHarness.getVisibleLogicalRange.mockReset();
+     chartHarness.getVisibleLogicalRange.mockReturnValue({ from: 0, to: 1 });
+@@ -98,13 +101,13 @@ describe('CandlestickChart streaming history', () => {
+     };
+   });
+ 
+-  it('paints two years first, starts one predecessor read, and keeps a fixed tail width', async () => {
++  it('paints two years without starting a predecessor read and keeps a fixed tail width', async () => {
+     renderChart();
+ 
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+     await screen.findByText('12.00');
+     expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
+-    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+     expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledWith({ from: 0, to: 1 });
+   });
+@@ -120,7 +123,7 @@ describe('CandlestickChart streaming history', () => {
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+   });
+ 
+-  it('shares the two requests across every interactive timeframe', async () => {
++  it('shares one initial request and one user-demanded page across every interactive timeframe', async () => {
+     let resolveRange;
+     chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+       resolveRange = resolve;
+@@ -128,48 +131,48 @@ describe('CandlestickChart streaming history', () => {
+     renderChart();
+ 
+     await screen.findByText('12.00');
+-    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
+     for (const label of ['Weekly K', 'Monthly K', 'Quarterly K', 'Yearly K', 'Daily K']) {
+       fireEvent.click(screen.getByRole('button', { name: label }));
+     }
+ 
+     expect(chartHarness.fetchHistory).toHaveBeenCalledTimes(1);
+     expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
+-    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++
++    fireEvent.wheel(screen.getByTestId('candlestick-chart-canvas'), { deltaX: 40, deltaY: 0 });
++    chartHarness.logicalRangeHandler({ from: -20, to: 40 });
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
+ 
+     resolveRange([
+       { date: '2025-01-02', open: 8, high: 10, low: 7, close: 9, volume: 80 },
+     ]);
+     await waitFor(() => expect(
+       screen.getByTestId('candlestick-chart-canvas'),
+-    ).toHaveAttribute('data-history-state', 'exhausted'));
++    ).toHaveAttribute('data-history-state', 'ready'));
+   });
+ 
+-  it('reports deep-history readiness only after the predecessor request settles', async () => {
+-    let resolveRange;
++  it('reports background readiness only after the foreground idle grace period', async () => {
+     const onDataReady = vi.fn();
+     const onHistoryReady = vi.fn();
+-    chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+-      resolveRange = resolve;
+-    }));
+ 
+     renderChart({ onDataReady, onHistoryReady });
+     await waitFor(() => expect(onDataReady).toHaveBeenCalledWith('600000.SS'));
+     expect(onHistoryReady).not.toHaveBeenCalled();
+-
+-    resolveRange([
+-      { date: '2025-01-02', open: 8, high: 10, low: 7, close: 9, volume: 80 },
+-    ]);
+     await waitFor(() => expect(onHistoryReady).toHaveBeenCalledWith(
+       '600000.SS',
+-      'exhausted',
+-    ));
++      'idle',
++    ), { timeout: 2500 });
+   });
+ 
+   it('locks an exhausted shared history edge for non-daily timeframes', async () => {
+     chartHarness.fetchRange.mockResolvedValue([]);
+     renderChart();
+ 
++    await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
++    await screen.findByText('12.00');
++    fireEvent.wheel(screen.getByTestId('candlestick-chart-canvas'), { deltaX: 40, deltaY: 0 });
++    chartHarness.logicalRangeHandler({ from: -20, to: 40 });
+     await waitFor(() => expect(
+       screen.getByTestId('candlestick-chart-canvas'),
+     ).toHaveAttribute('data-history-state', 'exhausted'));
+@@ -178,6 +181,23 @@ describe('CandlestickChart streaming history', () => {
+     expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
+   });
+ 
++  it('cancels a delayed RS request when foreground history takes priority', async () => {
++    chartHarness.fetchRs.mockImplementation(() => new Promise(() => {}));
++    renderChart({ symbol: 'AAPL' });
++
++    await screen.findByText('12.00');
++    await waitFor(() => expect(chartHarness.fetchRs).toHaveBeenCalledTimes(1), { timeout: 2500 });
++    const rsSignal = chartHarness.fetchRs.mock.calls[0][2].signal;
++    expect(rsSignal.aborted).toBe(false);
++
++    const canvas = screen.getByTestId('candlestick-chart-canvas');
++    fireEvent.wheel(canvas, { deltaX: 40, deltaY: 0 });
++    chartHarness.logicalRangeHandler({ from: -20, to: 40 });
++
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    expect(rsSignal.aborted).toBe(true);
++  });
++
+   it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
+     let resolveRange;
+     chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+@@ -199,7 +219,7 @@ describe('CandlestickChart streaming history', () => {
+     await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
+     expect(chartHarness.fetchRange).toHaveBeenCalledWith(
+       '600000.SS',
+-      '2016-03-03',
++      '2025-01-25',
+       '2026-02-28',
+       expect.objectContaining({ signal: expect.any(AbortSignal) }),
+     );
+@@ -215,6 +235,9 @@ describe('CandlestickChart streaming history', () => {
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+     expect(chartHarness.setVisibleRange).not.toHaveBeenCalled();
+ 
++    chartHarness.logicalRangeHandler({ from: -18, to: 42 });
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++
+     chartHarness.setVisibleLogicalRange.mockClear();
+     chartHarness.getVisibleLogicalRange.mockReturnValue({ from: 20, to: 80 });
+     fireEvent.wheel(canvas, { ctrlKey: true, deltaX: 0, deltaY: -12 });
+diff --git a/src/components/Charts/chartTimeframes.js b/src/components/Charts/chartTimeframes.js
+index 1640021..4040399 100644
+--- a/src/components/Charts/chartTimeframes.js
++++ b/src/components/Charts/chartTimeframes.js
+@@ -22,7 +22,7 @@ export const chartPinchZoomDirection = (event) => {
+   return vertical < 0 ? 'in' : 'out';
+ };
+ 
+-export const STREAMING_HISTORY_PAGE_DAYS = 3650;
++export const STREAMING_HISTORY_PAGE_DAYS = 400;
+ export const STREAMING_HISTORY_PREFETCH_BARS = 50;
+ const HISTORY_START_GAP_TOLERANCE_DAYS = 31;
+ 
+@@ -40,21 +40,7 @@ export const visibleBarsForTimeframe = (timeframe, candleCount) => {
+   return Math.min(TIMEFRAME_VISIBLE_BARS[timeframe] ?? TIMEFRAME_VISIBLE_BARS.daily, candleCount);
+ };
+ 
+-export const historyPrefetchBarsForRange = (
+-  range,
+-  {
+-    minimum = STREAMING_HISTORY_PREFETCH_BARS,
+-    viewportMultiplier = 1.25,
+-  } = {},
+-) => {
+-  if (
+-    !range
+-    || !Number.isFinite(range.from)
+-    || !Number.isFinite(range.to)
+-    || range.to <= range.from
+-  ) return minimum;
+-  return Math.max(minimum, Math.ceil((range.to - range.from) * viewportMultiplier));
+-};
++export const historyPrefetchBarsForRange = () => STREAMING_HISTORY_PREFETCH_BARS;
+ 
+ export const previousHistoryPage = (
+   earliestDate,
+diff --git a/src/components/Charts/chartTimeframes.test.js b/src/components/Charts/chartTimeframes.test.js
+index 83ac11b..5b9c428 100644
+--- a/src/components/Charts/chartTimeframes.test.js
++++ b/src/components/Charts/chartTimeframes.test.js
+@@ -45,9 +45,9 @@ describe('chart timeframe controls', () => {
+     expect(previousHistoryPage('2026-03-01', 0)).toBeNull();
+   });
+ 
+-  it('loads a ten-year predecessor page by default', () => {
++  it('loads a bounded predecessor page by default', () => {
+     expect(previousHistoryPage('2026-03-01')).toEqual({
+-      start: '2016-03-03',
++      start: '2025-01-25',
+       end: '2026-02-28',
+     });
+   });
+@@ -68,8 +68,8 @@ describe('chart timeframe controls', () => {
+     expect(historyPageIsExhausted([{ date: '2018-01-02' }], range)).toBe(true);
+   });
+ 
+-  it('keeps at least one viewport of history prefetched', () => {
+-    expect(historyPrefetchBarsForRange({ from: -20, to: 160 })).toBe(225);
++  it('uses a fixed lightweight prefetch edge for every viewport', () => {
++    expect(historyPrefetchBarsForRange({ from: -20, to: 160 })).toBe(50);
+     expect(historyPrefetchBarsForRange(null)).toBe(50);
+   });
+ 

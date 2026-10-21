@@ -1,0 +1,84 @@
+diff --git a/frontend/src/components/Scan/ChartViewerModal.jsx b/frontend/src/components/Scan/ChartViewerModal.jsx
+index f2f980a8..b761ea39 100644
+--- a/frontend/src/components/Scan/ChartViewerModal.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.jsx
+@@ -558,6 +558,7 @@ function ChartViewerModal({
+               <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', bgcolor: 'background.paper' }}>
+                 {currentSymbol ? (
+                   <CandlestickChart
++                    key={currentSymbol}
+                     symbol={currentSymbol}
+                     period="6mo"
+                     height="100%"
+diff --git a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+index dbba377d..cc329bd5 100644
+--- a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+@@ -1,5 +1,6 @@
+ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+ import { fireEvent, render, screen } from '@testing-library/react';
++import { useState } from 'react';
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ import ChartViewerModal from './ChartViewerModal';
+@@ -20,13 +21,22 @@ vi.mock('../../hooks/useChartNavigation', () => ({
+   }),
+ }));
+ 
+-vi.mock('../Charts/CandlestickChart', () => ({
+-  default: ({ symbol, onDataReady }) => (
+-    <button type="button" onClick={() => onDataReady(symbol)}>
++vi.mock('../Charts/CandlestickChart', () => {
++  const MockCandlestickChart = ({ symbol, onDataReady }) => {
++    const [mountedFor] = useState(symbol);
++    return (
++      <button
++        type="button"
++        aria-label={`ready-${symbol}`}
++        data-mounted-for={mountedFor}
++        onClick={() => onDataReady(symbol)}
++      >
+       ready-{symbol}
+-    </button>
+-  ),
+-}));
++      </button>
++    );
++  };
++  return { default: MockCandlestickChart };
++});
+ 
+ vi.mock('../../api/priceHistory', () => ({
+   prefetchPriceHistoryBatch: (...args) => prefetchPriceHistoryBatch(...args),
+@@ -144,6 +154,31 @@ describe('ChartViewerModal readiness lifecycle', () => {
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
+   });
+ 
++  it('remounts chart state when the selected symbol changes', () => {
++    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++    const view = renderModal(queryClient);
++
++    expect(screen.getByRole('button', { name: 'ready-AAA' }))
++      .toHaveAttribute('data-mounted-for', 'AAA');
++
++    currentSymbol = 'BBB';
++    view.rerender(
++      <QueryClientProvider client={queryClient}>
++        <ChartViewerModal
++          open
++          onClose={vi.fn()}
++          initialSymbol="AAA"
++          scanId="scan-1"
++          navigationSymbolsOverride={['AAA', 'BBB']}
++          currentPageResults={[]}
++        />
++      </QueryClientProvider>
++    );
++
++    expect(screen.getByRole('button', { name: 'ready-BBB' }))
++      .toHaveAttribute('data-mounted-for', 'BBB');
++  });
++
+   it('does not warm adjacent CN charts after the current chart is ready', () => {
+     currentSymbol = '600000.SS';
+     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

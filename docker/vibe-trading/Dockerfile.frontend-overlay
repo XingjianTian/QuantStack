@@ -1,0 +1,9 @@
+ARG BASE_IMAGE=personal/vibe-trading-quant:0.2.1
+FROM ${BASE_IMAGE}
+
+# The 0.7.0 integration release changes only the already-built Web surface.
+# Reuse the validated Python runtime and replace its immutable static assets.
+COPY --chown=vibe:vibe dist/ /app/frontend/dist/
+
+LABEL org.opencontainers.image.version="0.7.0" \
+      io.sudox.quant.integration="research-only-with-independent-nautilus-link"

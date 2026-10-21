@@ -1,0 +1,6 @@
+# Copy to the private deployment as raggraph-api-compat.conf.
+# Preserve the currently audited machine-client authentication contract here.
+# Never commit or log the real token, cookie, htpasswd hash, or Authorization value.
+# The production cutover Gate must replace the historical static gateway credential
+# with a rotatable signed token or application-authenticated API path after callers
+# have been inventoried and regression-tested.

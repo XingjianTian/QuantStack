@@ -1,0 +1,10 @@
+{
+  "provider": "yfinance",
+  "captured_at": "2026-11-28T03:00:00Z",
+  "records": [
+    {"ticker": "AAPL", "Date": "2026-11-25T00:00:00-05:00", "Open": 278.10, "High": 281.20, "Low": 277.50, "Close": 280.80, "Adj Close": 280.55, "Volume": 42100000},
+    {"ticker": "AAPL", "Date": "2026-11-27T00:00:00-05:00", "Open": 281.00, "High": 282.40, "Low": 279.90, "Close": 281.70, "Adj Close": 281.45, "Volume": 19800000},
+    {"ticker": "IBM", "Date": "2026-11-25T00:00:00-05:00", "Open": 312.20, "High": 315.10, "Low": 311.40, "Close": 314.60, "Adj Close": 313.90, "Volume": 3120000},
+    {"ticker": "IBM", "Date": "2026-11-27T00:00:00-05:00", "Open": 314.80, "High": 316.00, "Low": 313.70, "Close": 315.20, "Adj Close": 314.50, "Volume": 1410000}
+  ]
+}

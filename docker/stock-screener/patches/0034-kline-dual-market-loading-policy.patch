@@ -1,0 +1,46 @@
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -252,4 +252,4 @@ function CandlestickChart({
+   // Non-chart reads may start only after the foreground has stayed idle. The
+   // short grace period gives an immediate left-pan a chance to claim the NAS
+-  // path before the default US RS overlay or modal prefetch begins.
++  // path before the optional RS overlay or modal prefetch begins.
+   useEffect(() => {
+diff --git a/frontend/src/components/Scan/ChartViewerModal.jsx b/frontend/src/components/Scan/ChartViewerModal.jsx
+--- a/frontend/src/components/Scan/ChartViewerModal.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.jsx
+@@ -289,8 +289,4 @@ function ChartViewerModal({
+   useEffect(() => {
+     if (!open || !currentSymbol || historyReadySymbol !== currentSymbol || !navigationSymbols) return;
+-    // CN qfq history is already local. Warming adjacent CN symbols competes
+-    // with the next explicit chart click for the same NAS-backed read path.
+-    // Keep adjacent prefetch for US, where it measurably improves navigation.
+-    if (/\.(SS|SZ)$/i.test(currentSymbol)) return;
+-
++
+     const nextSymbols = navigationSymbols.slice(currentIndex + 1, currentIndex + 3);
+diff --git a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+--- a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+@@ -203,2 +203,2 @@ describe('ChartViewerModal readiness lifecycle', () => {
+-  it('does not warm adjacent CN charts after the current chart is ready', () => {
++  it('uses the same abortable adjacent prefetch for CN after chart history is ready', () => {
+     currentSymbol = '600000.SS';
+@@ -210,3 +210,14 @@ describe('ChartViewerModal readiness lifecycle', () => {
+-    expect(prefetchPriceHistoryBatch).not.toHaveBeenCalled();
+-    expect(prefetchFundamentalsBatch).not.toHaveBeenCalled();
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++    expect(prefetchFundamentalsBatch).toHaveBeenCalledTimes(1);
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledWith(
++      queryClient,
++      ['AAA'],
++      '6mo',
++      { signal: expect.any(AbortSignal) },
++    );
++    expect(prefetchFundamentalsBatch).toHaveBeenCalledWith(
++      queryClient,
++      ['AAA'],
++      { signal: expect.any(AbortSignal) },
++    );
+   });

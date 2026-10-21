@@ -1,0 +1,14 @@
+{
+  "fixture_kind": "documentation_contract_sample",
+  "provider": "baostock",
+  "provider_version": "0.9.3",
+  "endpoint": "query_history_k_data_plus",
+  "upstream_source": "BaoStock public data service",
+  "request_parameters": {"code": "sh.600000", "frequency": "d", "adjustflag": "3"},
+  "volume_unit": "share",
+  "volume_multiplier_to_shares": 1,
+  "amount_unit": "CNY",
+  "price_adjustment": "unadjusted",
+  "source_documentation": "https://www.baostock.com/baostock/index.php/Python_API文档",
+  "native_record": {"date": "2026-07-28", "code": "sh.600000", "volume": "123400"}
+}

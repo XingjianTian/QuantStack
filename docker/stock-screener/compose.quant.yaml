@@ -1,0 +1,316 @@
+name: quant-workspace
+
+# Apply after the official stock-screener docker-compose.yml and
+# docker-compose.release.yml. This file owns only our deployment boundary;
+# upstream application source remains unmodified.
+services:
+  proxy-relay:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: never
+    network_mode: host
+    command: python /opt/quant/proxy_relay.py
+    environment:
+      PROXY_RELAY_BIND_ADDRESS: ${PROXY_RELAY_BIND_ADDRESS:-127.0.0.1}
+      PROXY_RELAY_BIND_PORT: "7891"
+      PROXY_RELAY_UPSTREAM_HOST: 127.0.0.1
+      PROXY_RELAY_UPSTREAM_PORT: "7890"
+    volumes:
+      - ./proxy_relay.py:/opt/quant/proxy_relay.py:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 48M
+        reservations:
+          memory: 12M
+    logging: &small-logs
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+        reservations:
+          memory: 192M
+    logging: *small-logs
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 192M
+        reservations:
+          memory: 48M
+    logging: *small-logs
+
+  backend:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment:
+      # A single process prevents concurrent Alembic startup work on the NAS.
+      WEB_CONCURRENCY: "1"
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "2"
+      HTTP_PROXY: ${QUANT_WORKSPACE_HTTP_PROXY:-}
+      HTTPS_PROXY: ${QUANT_WORKSPACE_HTTP_PROXY:-}
+      NO_PROXY: postgres,redis,backend,frontend,127.0.0.1,localhost,api.github.com,.eastmoney.com,eastmoney.com
+      FEATURE_CHATBOT: "false"
+      FEATURE_THEMES: "false"
+      # Public access is authenticated by the OpenResty boundary. Disable the
+      # upstream password-cookie screen to avoid a second login prompt.
+      SERVER_AUTH_ENABLED: "false"
+      # QuantStack qfq is the default CN daily source. Set read mode to legacy
+      # and recreate the backend for the rollback path.
+      SS_QUANTSTACK_READ_MODE: ${SS_QUANTSTACK_READ_MODE:-quantstack_primary}
+      SS_QUANTSTACK_PRIMARY_ENABLED: ${SS_QUANTSTACK_PRIMARY_ENABLED:-true}
+      SS_QUANTSTACK_SHADOW_ENABLED: ${SS_QUANTSTACK_SHADOW_ENABLED:-false}
+      SS_QUANTSTACK_SHADOW_SAMPLE_RATE: ${SS_QUANTSTACK_SHADOW_SAMPLE_RATE:-0}
+      SS_QUANTSTACK_SHADOW_ALLOWLIST: ${SS_QUANTSTACK_SHADOW_ALLOWLIST:-}
+      SS_SCAN_ANALYTICS_TIMEOUT_SECONDS: ${SS_SCAN_ANALYTICS_TIMEOUT_SECONDS:-30}
+      SS_SCAN_ANALYTICS_MAX_ATTEMPTS: ${SS_SCAN_ANALYTICS_MAX_ATTEMPTS:-1}
+      SS_QUANTSTACK_BASE_URL: ${SS_QUANTSTACK_BASE_URL:-}
+      SS_QUANTSTACK_API_KEY: ${SS_QUANTSTACK_API_KEY:-}
+      SS_QUANTSTACK_BARS_DATASET_ID: ${SS_QUANTSTACK_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_DATASET_VERSION: ${SS_QUANTSTACK_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_BARS_DATASET_ID: ${SS_QUANTSTACK_US_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_DATASET_VERSION: ${SS_QUANTSTACK_US_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_DEFAULT: ${SS_QUANTSTACK_US_DEFAULT:-false}
+      SS_QUANTSTACK_TIMEOUT_SECONDS: ${SS_QUANTSTACK_TIMEOUT_SECONDS:-5}
+      SS_QUANTSTACK_MAX_ATTEMPTS: ${SS_QUANTSTACK_MAX_ATTEMPTS:-2}
+      SS_QUANTSTACK_SHADOW_MAX_WINDOW_DAYS: ${SS_QUANTSTACK_SHADOW_MAX_WINDOW_DAYS:-3650}
+      SS_QUANTSTACK_CACHE_MAX_ENTRIES: ${SS_QUANTSTACK_CACHE_MAX_ENTRIES:-2048}
+      SS_QUANTSTACK_METADATA_TTL_SECONDS: ${SS_QUANTSTACK_METADATA_TTL_SECONDS:-30}
+      SS_QUANTSTACK_SHADOW_QUEUE_SIZE: ${SS_QUANTSTACK_SHADOW_QUEUE_SIZE:-128}
+      SS_QUANTSTACK_SHADOW_MAX_SYMBOLS_PER_TASK: ${SS_QUANTSTACK_SHADOW_MAX_SYMBOLS_PER_TASK:-100}
+      SS_QUANTSTACK_SHADOW_MAX_LEGACY_ROWS_PER_TASK: ${SS_QUANTSTACK_SHADOW_MAX_LEGACY_ROWS_PER_TASK:-100000}
+      SS_QUANTSTACK_SHUTDOWN_TIMEOUT_SECONDS: ${SS_QUANTSTACK_SHUTDOWN_TIMEOUT_SECONDS:-1}
+      SS_QUANTSTACK_SHADOW_REPORT_ROOT: ${SS_QUANTSTACK_SHADOW_REPORT_ROOT:-/app/data/quantstack-shadow-reports}
+      SS_RUNTIME_ENV: ${SS_RUNTIME_ENV:-production}
+      SS_QUANTSTACK_ALLOW_CANDIDATE: ${SS_QUANTSTACK_ALLOW_CANDIDATE:-false}
+      SS_REQUIRED_SCAN_ANALYTICS_VERSION: ${SS_REQUIRED_SCAN_ANALYTICS_VERSION:-quantstack.scan-analytics.v1}
+    command: uvicorn quant_workspace_compat:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./data:/app/data
+      - ./quant_workspace_compat.py:/app/quant_workspace_compat.py:ro
+      - ./quantstack_consumer_adapter.py:/app/quantstack_consumer_adapter.py:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          memory: 384M
+    # The first PostgreSQL migration performs many fsyncs on the NAS data
+    # volume. Give it enough startup grace without weakening steady-state probes.
+    healthcheck:
+      start_period: 300s
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging: &app-logs
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  celery-general:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment: &proxied-worker-environment
+      HTTP_PROXY: ${QUANT_WORKSPACE_HTTP_PROXY:-}
+      HTTPS_PROXY: ${QUANT_WORKSPACE_HTTP_PROXY:-}
+      NO_PROXY: postgres,redis,backend,frontend,127.0.0.1,localhost,api.github.com,.eastmoney.com,eastmoney.com
+      FEATURE_CHATBOT: "false"
+      FEATURE_THEMES: "false"
+      SS_SCAN_ANALYTICS_TIMEOUT_SECONDS: ${SS_SCAN_ANALYTICS_TIMEOUT_SECONDS:-30}
+      SS_SCAN_ANALYTICS_MAX_ATTEMPTS: ${SS_SCAN_ANALYTICS_MAX_ATTEMPTS:-1}
+      # QuantStack owns the production CN daily-price lifecycle. The upstream
+      # market-jobs worker remains available through an explicit profile.
+      SS_MARKET_JOBS_ENABLED: ${SS_MARKET_JOBS_ENABLED:-false}
+      SS_REQUIRED_SCAN_ANALYTICS_VERSION: ${SS_REQUIRED_SCAN_ANALYTICS_VERSION:-quantstack.scan-analytics.v1}
+      # Final scan analytics execute on the general queue, so it must resolve
+      # exactly the same accepted Catalog releases as both market scan workers.
+      SS_QUANTSTACK_READ_MODE: ${SS_QUANTSTACK_READ_MODE:-quantstack_primary}
+      SS_QUANTSTACK_PRIMARY_ENABLED: ${SS_QUANTSTACK_PRIMARY_ENABLED:-true}
+      SS_QUANTSTACK_BASE_URL: ${SS_QUANTSTACK_BASE_URL:-}
+      SS_QUANTSTACK_API_KEY: ${SS_QUANTSTACK_API_KEY:-}
+      SS_QUANTSTACK_BARS_DATASET_ID: ${SS_QUANTSTACK_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_DATASET_VERSION: ${SS_QUANTSTACK_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_BARS_DATASET_ID: ${SS_QUANTSTACK_US_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_DATASET_VERSION: ${SS_QUANTSTACK_US_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_TIMEOUT_SECONDS: ${SS_QUANTSTACK_TIMEOUT_SECONDS:-5}
+      SS_QUANTSTACK_MAX_ATTEMPTS: ${SS_QUANTSTACK_MAX_ATTEMPTS:-2}
+      SS_QUANTSTACK_CACHE_MAX_ENTRIES: ${SS_QUANTSTACK_SCAN_CACHE_MAX_ENTRIES:-100}
+      SS_RUNTIME_ENV: ${SS_RUNTIME_ENV:-production}
+      SS_QUANTSTACK_ALLOW_CANDIDATE: ${SS_QUANTSTACK_ALLOW_CANDIDATE:-false}
+    command: celery -A quant_workspace_celery:celery_app worker --pool=prefork --loglevel=info --concurrency=1 --without-mingle --without-gossip -Q celery -n general@%h
+    volumes:
+      - ./quant_workspace_celery.py:/app/quant_workspace_celery.py:ro
+      - ./quant_workspace_compat.py:/app/quant_workspace_compat.py:ro
+      - ./quantstack_consumer_adapter.py:/app/quantstack_consumer_adapter.py:ro
+    deploy: &worker-resources
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 640M
+        reservations:
+          memory: 160M
+    logging: *app-logs
+
+  celery-datafetch:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment: *proxied-worker-environment
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          memory: 192M
+    logging: *app-logs
+
+  celery-userscans:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment: *proxied-worker-environment
+    profiles: ["ss-shared-scan-fallback"]
+    deploy: &small-worker-resources
+      resources:
+        limits:
+          cpus: "0.35"
+          memory: 384M
+        reservations:
+          memory: 96M
+    logging: *app-logs
+
+  celery-marketjobs-cn:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment: *proxied-worker-environment
+    # Replace upstream's market-cn profile instead of merging with it.
+    profiles: !override ["ss-market-maintenance"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          memory: 192M
+    logging: *app-logs
+
+  celery-userscans-cn:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment:
+      <<: *proxied-worker-environment
+      SS_QUANTSTACK_READ_MODE: ${SS_QUANTSTACK_READ_MODE:-quantstack_primary}
+      SS_QUANTSTACK_PRIMARY_ENABLED: ${SS_QUANTSTACK_PRIMARY_ENABLED:-true}
+      SS_QUANTSTACK_SHADOW_ENABLED: ${SS_QUANTSTACK_SHADOW_ENABLED:-false}
+      SS_QUANTSTACK_SHADOW_SAMPLE_RATE: ${SS_QUANTSTACK_SHADOW_SAMPLE_RATE:-0}
+      SS_QUANTSTACK_SHADOW_ALLOWLIST: ${SS_QUANTSTACK_SHADOW_ALLOWLIST:-}
+      SS_QUANTSTACK_BASE_URL: ${SS_QUANTSTACK_BASE_URL:-}
+      SS_QUANTSTACK_API_KEY: ${SS_QUANTSTACK_API_KEY:-}
+      SS_QUANTSTACK_BARS_DATASET_ID: ${SS_QUANTSTACK_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_DATASET_VERSION: ${SS_QUANTSTACK_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_BARS_DATASET_ID: ${SS_QUANTSTACK_US_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_DATASET_VERSION: ${SS_QUANTSTACK_US_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_TIMEOUT_SECONDS: ${SS_QUANTSTACK_TIMEOUT_SECONDS:-5}
+      SS_QUANTSTACK_MAX_ATTEMPTS: ${SS_QUANTSTACK_MAX_ATTEMPTS:-2}
+      SS_QUANTSTACK_SHADOW_MAX_WINDOW_DAYS: ${SS_QUANTSTACK_SHADOW_MAX_WINDOW_DAYS:-3650}
+      SS_QUANTSTACK_CACHE_MAX_ENTRIES: ${SS_QUANTSTACK_SCAN_CACHE_MAX_ENTRIES:-100}
+      SS_QUANTSTACK_SHADOW_QUEUE_SIZE: ${SS_QUANTSTACK_SHADOW_QUEUE_SIZE:-128}
+      SS_QUANTSTACK_SHADOW_MAX_SYMBOLS_PER_TASK: ${SS_QUANTSTACK_SHADOW_MAX_SYMBOLS_PER_TASK:-100}
+      SS_QUANTSTACK_SHADOW_MAX_LEGACY_ROWS_PER_TASK: ${SS_QUANTSTACK_SHADOW_MAX_LEGACY_ROWS_PER_TASK:-100000}
+      SS_QUANTSTACK_SHUTDOWN_TIMEOUT_SECONDS: ${SS_QUANTSTACK_SHUTDOWN_TIMEOUT_SECONDS:-1}
+      SS_QUANTSTACK_SHADOW_REPORT_ROOT: ${SS_QUANTSTACK_SHADOW_REPORT_ROOT:-/app/data/quantstack-shadow-reports}
+      SS_RUNTIME_ENV: ${SS_RUNTIME_ENV:-production}
+      SS_QUANTSTACK_ALLOW_CANDIDATE: ${SS_QUANTSTACK_ALLOW_CANDIDATE:-false}
+    command: celery -A quant_workspace_celery:celery_app worker --pool=prefork --loglevel=info --concurrency=1 --without-mingle --without-gossip -Q user_scans_cn -n userscans-cn@%h
+    volumes:
+      - ./quant_workspace_celery.py:/app/quant_workspace_celery.py:ro
+      - ./quant_workspace_compat.py:/app/quant_workspace_compat.py:ro
+      - ./quantstack_consumer_adapter.py:/app/quantstack_consumer_adapter.py:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+        reservations:
+          memory: 256M
+    logging: *app-logs
+
+  celery-userscans-us:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    profiles: !override []
+    environment:
+      <<: *proxied-worker-environment
+      SS_QUANTSTACK_READ_MODE: ${SS_QUANTSTACK_READ_MODE:-quantstack_primary}
+      SS_QUANTSTACK_PRIMARY_ENABLED: ${SS_QUANTSTACK_PRIMARY_ENABLED:-true}
+      SS_QUANTSTACK_SHADOW_ENABLED: ${SS_QUANTSTACK_SHADOW_ENABLED:-false}
+      SS_QUANTSTACK_SHADOW_SAMPLE_RATE: ${SS_QUANTSTACK_SHADOW_SAMPLE_RATE:-0}
+      SS_QUANTSTACK_BASE_URL: ${SS_QUANTSTACK_BASE_URL:-}
+      SS_QUANTSTACK_API_KEY: ${SS_QUANTSTACK_API_KEY:-}
+      SS_QUANTSTACK_BARS_DATASET_ID: ${SS_QUANTSTACK_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_DATASET_VERSION: ${SS_QUANTSTACK_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_BARS_DATASET_ID: ${SS_QUANTSTACK_US_BARS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_ID:-}
+      SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION: ${SS_QUANTSTACK_US_INSTRUMENTS_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_US_DATASET_VERSION: ${SS_QUANTSTACK_US_DATASET_VERSION:-latest}
+      SS_QUANTSTACK_TIMEOUT_SECONDS: ${SS_QUANTSTACK_TIMEOUT_SECONDS:-5}
+      SS_QUANTSTACK_MAX_ATTEMPTS: ${SS_QUANTSTACK_MAX_ATTEMPTS:-2}
+      SS_QUANTSTACK_CACHE_MAX_ENTRIES: ${SS_QUANTSTACK_SCAN_CACHE_MAX_ENTRIES:-100}
+      SS_RUNTIME_ENV: ${SS_RUNTIME_ENV:-production}
+      SS_QUANTSTACK_ALLOW_CANDIDATE: ${SS_QUANTSTACK_ALLOW_CANDIDATE:-false}
+    command: celery -A quant_workspace_celery:celery_app worker --pool=prefork --loglevel=info --concurrency=1 --without-mingle --without-gossip -Q user_scans_us -n userscans-us@%h
+    volumes:
+      - ./quant_workspace_celery.py:/app/quant_workspace_celery.py:ro
+      - ./quant_workspace_compat.py:/app/quant_workspace_compat.py:ro
+      - ./quantstack_consumer_adapter.py:/app/quantstack_consumer_adapter.py:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+        reservations:
+          memory: 256M
+    logging: *app-logs
+
+  celery-beat:
+    image: ${QUANT_WORKSPACE_BACKEND_IMAGE_REF:?set immutable backend image reference}
+    pull_policy: missing
+    environment: *proxied-worker-environment
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 192M
+        reservations:
+          memory: 48M
+    logging: *small-logs
+
+  frontend:
+    image: ${QUANT_WORKSPACE_FRONTEND_IMAGE_REF:?set immutable frontend image reference}
+    pull_policy: missing
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 96M
+        reservations:
+          memory: 24M
+    logging: *small-logs

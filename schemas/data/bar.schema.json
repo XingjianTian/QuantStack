@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/bar/1.0.0",
+  "title": "QuantStack Normalized Bar",
+  "type": "object", "additionalProperties": false,
+  "required": ["instrument_id", "ts_event", "open", "high", "low", "close", "volume", "currency"],
+  "properties": {
+    "instrument_id": {"type": "string"}, "ts_event": {"type": "string", "format": "date-time"},
+    "open": {"type": "number", "minimum": 0}, "high": {"type": "number", "minimum": 0},
+    "low": {"type": "number", "minimum": 0}, "close": {"type": "number", "minimum": 0},
+    "volume": {"type": "number", "minimum": 0}, "vwap": {"type": ["number", "null"], "minimum": 0},
+    "currency": {"enum": ["CNY", "HKD", "USD"]}
+  }
+}

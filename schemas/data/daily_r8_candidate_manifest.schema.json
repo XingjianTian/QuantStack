@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/daily-r8-candidate-manifest/v1",
+  "title": "QuantStack Isolated R8 Candidate Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "candidate_id", "revision", "market", "session", "snapshot_id",
+    "dataset", "price_basis", "quality_status", "gate_status", "immutable",
+    "canonical_eligible", "production_installable", "source", "artifacts", "coverage"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {"quality_status": {"const": "complete"}},
+        "required": ["quality_status"]
+      },
+      "then": {
+        "properties": {"coverage": {"properties": {"pending": {"const": 0}}}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"quality_status": {"const": "blocked"}},
+        "required": ["quality_status"]
+      },
+      "then": {"properties": {"gate_status": {"const": "blocked"}}}
+    },
+    {
+      "if": {
+        "properties": {"gate_status": {"const": "ready"}},
+        "required": ["gate_status"]
+      },
+      "then": {
+        "properties": {
+          "quality_status": {"enum": ["complete", "usable_partial", "usable_partial_exception"]}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "count": {"type": "integer", "minimum": 0}
+  },
+  "properties": {
+    "schema_version": {"const": "quantstack.daily-r8-candidate-manifest.v1"},
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\.\\.?$)(?!.*[\\\\/]).+$"
+    },
+    "revision": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "market": {"type": "string", "minLength": 1},
+    "session": {"type": "string", "format": "date"},
+    "snapshot_id": {"type": "string", "minLength": 1},
+    "dataset": {"type": "string", "minLength": 1},
+    "price_basis": {"type": "string", "minLength": 1},
+    "quality_status": {
+      "enum": ["complete", "usable_partial", "usable_partial_exception", "blocked"]
+    },
+    "gate_status": {"enum": ["ready", "blocked"]},
+    "immutable": {"const": true},
+    "canonical_eligible": {"const": false},
+    "production_installable": {"const": false},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rows", "assessment", "coverage", "ledger_snapshot", "ledger_events"],
+      "properties": {
+        "rows": {
+          "allOf": [
+            {"$ref": "#/$defs/artifact"},
+            {"properties": {"path": {"const": "data/rows.jsonl"}}}
+          ]
+        },
+        "assessment": {
+          "allOf": [
+            {"$ref": "#/$defs/artifact"},
+            {"properties": {"path": {"const": "assessment.json"}}}
+          ]
+        },
+        "coverage": {
+          "allOf": [
+            {"$ref": "#/$defs/artifact"},
+            {"properties": {"path": {"const": "coverage.json"}}}
+          ]
+        },
+        "ledger_snapshot": {
+          "allOf": [
+            {"$ref": "#/$defs/artifact"},
+            {"properties": {"path": {"const": "ledger/snapshot.json"}}}
+          ]
+        },
+        "ledger_events": {
+          "allOf": [
+            {"$ref": "#/$defs/artifact"},
+            {"properties": {"path": {"const": "ledger/events/segment-0001.jsonl"}}}
+          ]
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["universe", "returned", "explicit_no_bar", "pending"],
+      "properties": {
+        "universe": {"$ref": "#/$defs/count"},
+        "returned": {"$ref": "#/$defs/count"},
+        "explicit_no_bar": {"$ref": "#/$defs/count"},
+        "pending": {"$ref": "#/$defs/count"}
+      }
+    }
+  }
+}

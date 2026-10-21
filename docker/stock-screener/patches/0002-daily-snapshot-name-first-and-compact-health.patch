@@ -1,0 +1,167 @@
+diff --git a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
+index 97b263e9..d2ea6e17 100644
+--- a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
++++ b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
+@@ -159,12 +159,7 @@ function DailyMarketSnapshotTab() {
+           return (
+             <Grid item xs={6} sm={4} md={2.4} key={item.symbol}>
+               <Paper elevation={0} sx={{ p: 1.5, height: '100%', border: '1px solid', borderColor: 'divider' }}>
+-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '13px' }}>
+-                  {item.symbol}
+-                </Typography>
+-                <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '10px' }}>
+-                  {item.display_name}
+-                </Typography>
++                <TickerCell symbol={item.symbol} companyName={item.display_name} />
+                 <Typography variant="body1" sx={{ mt: 0.5, fontFamily: 'monospace', fontWeight: 600 }}>
+                   {formatLocalCurrency(item.latest_close, item.currency || 'USD')}
+                 </Typography>
+diff --git a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.test.jsx b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.test.jsx
+index 32400b54..964fe6d0 100644
+--- a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.test.jsx
++++ b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.test.jsx
+@@ -135,8 +135,11 @@ describe('DailyMarketSnapshotTab', () => {
+     expect(screen.getByText(/America\/New_York/)).toBeInTheDocument();
+     expect(screen.queryByText(/Breadth 2026-04-24/)).not.toBeInTheDocument();
+
+-    // Key market card renders the aliased instrument with data...
+-    expect(screen.getByText('BITSTAMP:BTCUSD')).toBeInTheDocument();
++    // Key market cards use the readable name as the primary label, with the
++    // exchange ticker retained as secondary technical context.
++    const marketName = screen.getByText('Bitcoin');
++    const marketSymbol = screen.getByText('BITSTAMP:BTCUSD');
++    expect(marketName.compareDocumentPosition(marketSymbol) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+     // ...while instruments without history are hidden instead of showing "-"
+     expect(screen.queryByText('TVC:VIX')).not.toBeInTheDocument();
+
+diff --git a/frontend/src/components/MarketScan/MarketHealthExposure.jsx b/frontend/src/components/MarketScan/MarketHealthExposure.jsx
+index c9bcadd0..e4b4bde0 100644
+--- a/frontend/src/components/MarketScan/MarketHealthExposure.jsx
++++ b/frontend/src/components/MarketScan/MarketHealthExposure.jsx
+@@ -1,4 +1,4 @@
+-import { Fragment, useMemo } from 'react';
++import { useMemo } from 'react';
+ import { Box, Chip, Grid, Paper, Typography } from '@mui/material';
+ import {
+   Area,
+@@ -115,48 +115,68 @@ function MarketHealthExposure({ exposure }) {
+         </Typography>
+       </Box>
+
+-      <Grid container spacing={2}>
++      <Grid container spacing={2} alignItems="stretch">
+         {/* Left: gauge + stance + readout */}
+         <Grid item xs={12} md={4}>
+-          <Box sx={{ position: 'relative', height: 150 }}>
+-            <ResponsiveContainer width="100%" height="100%">
+-              <RadialBarChart
+-                innerRadius="72%"
+-                outerRadius="100%"
+-                startAngle={180}
+-                endAngle={0}
+-                data={[{ value: score, fill: color }]}
+-              >
+-                <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+-                <RadialBar background dataKey="value" cornerRadius={6} />
+-              </RadialBarChart>
+-            </ResponsiveContainer>
+-            <Box sx={{ position: 'absolute', inset: 0, top: '28%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
+-              <Typography sx={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color }}>
+-                {fmt(score, 0)}
+-              </Typography>
+-              <Typography variant="caption" color="text.secondary">/ 100 exposure</Typography>
+-            </Box>
+-          </Box>
++          <Box
++            data-testid="market-health-summary"
++            sx={{
++              display: 'grid',
++              gridTemplateColumns: { xs: '1fr', sm: 'minmax(140px, 0.95fr) minmax(150px, 1.05fr)' },
++              alignItems: 'center',
++              gap: { xs: 1, sm: 1.5 },
++              height: '100%',
++              minHeight: { sm: 194 },
++            }}
++          >
++            <Box>
++              <Box sx={{ position: 'relative', height: 136 }}>
++                <ResponsiveContainer width="100%" height="100%">
++                  <RadialBarChart
++                    innerRadius="72%"
++                    outerRadius="100%"
++                    startAngle={180}
++                    endAngle={0}
++                    data={[{ value: score, fill: color }]}
++                  >
++                    <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
++                    <RadialBar background dataKey="value" cornerRadius={6} />
++                  </RadialBarChart>
++                </ResponsiveContainer>
++                <Box sx={{ position: 'absolute', inset: 0, top: '28%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
++                  <Typography sx={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color }}>
++                    {fmt(score, 0)}
++                  </Typography>
++                  <Typography variant="caption" color="text.secondary">/ 100 exposure</Typography>
++                </Box>
++              </Box>
+
+-          <Box sx={{ textAlign: 'center', mt: 0.5 }}>
+-            <Chip label={exposure.stance} size="small" sx={{ bgcolor: color, color: '#fff', fontWeight: 600 }} />
+-          </Box>
++              <Box sx={{ textAlign: 'center', mt: 0.25 }}>
++                <Chip label={exposure.stance} size="small" sx={{ bgcolor: color, color: '#fff', fontWeight: 600 }} />
++              </Box>
++            </Box>
+
+-          <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 0.5, columnGap: 1 }}>
+-            {[
+-              ['Distribution days', exposure.distribution_day_count],
+-              ['Trend', exposure.trend || '-'],
+-              ['Follow-through day', exposure.follow_through_day ? 'Yes' : 'No'],
+-              ['VIX', exposure.vix != null ? fmt(exposure.vix, 1) : '-'],
+-            ].map(([label, value]) => (
+-              <Fragment key={label}>
+-                <Typography variant="caption" color="text.secondary">{label}</Typography>
+-                <Typography variant="caption" sx={{ fontFamily: 'monospace', textAlign: 'right', fontWeight: 600 }}>
+-                  {value}
+-                </Typography>
+-              </Fragment>
+-            ))}
++            <Box
++              data-testid="market-health-readout"
++              sx={{ display: 'grid', alignContent: 'center', gap: 0.75, minWidth: 0 }}
++            >
++              {[
++                ['Distribution days', exposure.distribution_day_count],
++                ['Trend', exposure.trend || '-'],
++                ['Follow-through day', exposure.follow_through_day ? 'Yes' : 'No'],
++                ['VIX', exposure.vix != null ? fmt(exposure.vix, 1) : '-'],
++              ].map(([label, value]) => (
++                <Box
++                  key={label}
++                  sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'baseline', gap: 1 }}
++                >
++                  <Typography variant="caption" color="text.secondary">{label}</Typography>
++                  <Typography variant="caption" sx={{ fontFamily: 'monospace', textAlign: 'right', fontWeight: 600 }}>
++                    {value}
++                  </Typography>
++                </Box>
++              ))}
++            </Box>
+           </Box>
+         </Grid>
+
+diff --git a/frontend/src/components/MarketScan/MarketHealthExposure.test.jsx b/frontend/src/components/MarketScan/MarketHealthExposure.test.jsx
+index cbae1aa6..753496a7 100644
+--- a/frontend/src/components/MarketScan/MarketHealthExposure.test.jsx
++++ b/frontend/src/components/MarketScan/MarketHealthExposure.test.jsx
+@@ -23,6 +23,9 @@ const SAMPLE = {
+ describe('MarketHealthExposure', () => {
+   it('renders the score, stance, and a why-breakdown', () => {
+     renderWithProviders(<MarketHealthExposure exposure={SAMPLE} />);
++    expect(screen.getByTestId('market-health-summary')).toContainElement(
++      screen.getByTestId('market-health-readout')
++    );
+     expect(screen.getByText('42')).toBeInTheDocument();
+     expect(screen.getAllByText('Uptrend Under Pressure').length).toBeGreaterThan(0);
+     expect(screen.getByText('Distribution days')).toBeInTheDocument();

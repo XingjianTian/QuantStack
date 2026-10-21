@@ -1,0 +1,13 @@
+environment: development
+mode: research_only
+data_root: ${QUANT_DATA_ROOT}
+experiment_root: ${QUANT_EXPERIMENT_ROOT}
+upstreams:
+  nautilus_trader: ../upstream/nautilus_trader
+  vibe_trading: ../upstream/Vibe-Trading
+execution:
+  broker_connections_enabled: false
+  live_order_writes_enabled: false
+logging:
+  level: INFO
+  redact_secrets: true

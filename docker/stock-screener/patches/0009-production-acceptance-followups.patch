@@ -1,0 +1,290 @@
+diff --git a/frontend/src/utils/symbolMarket.js b/frontend/src/utils/symbolMarket.js
+index f085421..7f33c25 100644
+--- a/frontend/src/utils/symbolMarket.js
++++ b/frontend/src/utils/symbolMarket.js
+@@ -6,8 +6,14 @@ export const marketFromSymbol = (symbol) => {
+   return 'US';
+ };
+ 
++export const marketFromRow = (row) => {
++  const symbol = String(row?.symbol || '').trim().toUpperCase();
++  if (CN_SUFFIXES.some((suffix) => symbol.endsWith(suffix))) return 'CN';
++  return String(row?.market || marketFromSymbol(symbol)).trim().toUpperCase();
++};
++
+ export const filterRowsForMarket = (rows, market) => (
+   !market ? (rows || []) : (rows || []).filter((row) => (
+-    String(row?.market || marketFromSymbol(row?.symbol)).toUpperCase() === String(market).toUpperCase()
++    marketFromRow(row) === String(market).toUpperCase()
+   ))
+ );
+diff --git a/frontend/src/components/MarketScan/WatchlistsTab.jsx b/frontend/src/components/MarketScan/WatchlistsTab.jsx
+index 0ba09d6..807ee22 100644
+--- a/frontend/src/components/MarketScan/WatchlistsTab.jsx
++++ b/frontend/src/components/MarketScan/WatchlistsTab.jsx
+@@ -127,9 +127,9 @@ function WatchlistsTab() {
+   };
+ 
+   const handleDownloadWatchlist = () => {
+-    if (!watchlistData?.items?.length) return;
++    if (!filteredWatchlistData?.items?.length) return;
+ 
+-    const csvContent = watchlistData.items
++    const csvContent = filteredWatchlistData.items
+       .map((item) => item.symbol)
+       .join('\n');
+ 
+@@ -203,7 +203,7 @@ function WatchlistsTab() {
+               <IconButton
+                 onClick={handleDownloadWatchlist}
+                 size="small"
+-                disabled={!watchlistData?.items?.length || dataLoading}
++                disabled={!filteredWatchlistData?.items?.length || dataLoading}
+               >
+                 <DownloadIcon fontSize="small" />
+               </IconButton>
+diff --git a/frontend/src/components/Layout/MarketSelector.jsx b/frontend/src/components/Layout/MarketSelector.jsx
+index 0586adc..c77d187 100644
+--- a/frontend/src/components/Layout/MarketSelector.jsx
++++ b/frontend/src/components/Layout/MarketSelector.jsx
+@@ -26,9 +26,10 @@ function MarketSelector() {
+       variant="standard"
+       disableUnderline
+       MenuProps={{
+         anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+         transformOrigin: { vertical: 'top', horizontal: 'left' },
+-        PaperProps: { sx: { mt: 0.5 } },
++        marginThreshold: 4,
++        PaperProps: { sx: { mt: 0.5, minWidth: 120 } },
+       }}
+       inputProps={{ 'aria-label': 'Market selector' }}
+       renderValue={(code) => `${marketFlag(code)} ${code}`}
+diff --git a/frontend/src/api/marketScan.js b/frontend/src/api/marketScan.js
+index 943ef0a..92e7a81 100644
+--- a/frontend/src/api/marketScan.js
++++ b/frontend/src/api/marketScan.js
+@@ -22,9 +22,10 @@ export const getWatchlist = async (listName) => {
+  * @param {string} market - Market code (e.g. 'US', 'HK')
+  * @returns {Promise<Object>} Daily snapshot payload
+  */
+-export const getDailySnapshot = async (market) => {
++export const getDailySnapshot = async (market, options = {}) => {
+   const response = await apiClient.get(`${BASE_PATH}/daily-snapshot`, {
+     params: { market },
++    signal: options.signal,
+   });
+   return response.data;
+ };
+diff --git a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
+index 439b6b6..a21dd12 100644
+--- a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
++++ b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
+@@ -49,10 +49,11 @@ function DailyMarketSnapshotTab() {
+   const { selectedMarket } = useMarket();
+   const snapshotQuery = useQuery({
+     queryKey: ['dailySnapshot', selectedMarket],
+-    queryFn: () => getDailySnapshot(selectedMarket),
++    queryFn: ({ signal }) => getDailySnapshot(selectedMarket, { signal }),
+     staleTime: 60_000,
+     retry: 1,
+     retryDelay: 0,
++    refetchOnWindowFocus: false,
+   });
+   const snapshot = snapshotQuery.data;
+   const scanId = snapshot?.scan_id ?? null;
+@@ -283,7 +284,9 @@ function DailyMarketSnapshotTab() {
+               {topGroups.length === 0 && (
+                 <TableRow>
+                   <TableCell colSpan={5} align="center" sx={{ color: 'text.disabled', py: 2 }}>
+-                    No group rankings available.
++                    {selectedMarket === 'US'
++                      ? 'US industry classifications are not published yet; rankings will appear after a classification source is connected.'
++                      : 'No group rankings are available for this session.'}
+                   </TableCell>
+                 </TableRow>
+               )}
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index 89de558..4409624 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -12,6 +12,14 @@ export const historyPeriodForTimeframe = (timeframe, fallback = '6mo') => (
+   ?? fallback
+ );
+ 
++const DAILY_HISTORY_PERIODS = ['6mo', '2y', '5y', '10y'];
++
++export const nextDailyHistoryPeriod = (period) => {
++  const index = DAILY_HISTORY_PERIODS.indexOf(period);
++  if (index < 0) return '2y';
++  return DAILY_HISTORY_PERIODS[Math.min(index + 1, DAILY_HISTORY_PERIODS.length - 1)];
++};
++
+ export const isDailyTimeframe = (timeframe) => timeframe === 'daily';
+ 
+ export const usesBundledPriceData = (timeframe, priceData) => (
+@@ -57,5 +65,17 @@ export const pannedLogicalRange = (range, wheelDelta, barCount) => {
+   if (!range || !Number.isFinite(wheelDelta) || wheelDelta === 0) return null;
+   const span = range.to - range.from;
+   const shift = Math.sign(wheelDelta) * Math.max(1, span * Math.min(Math.abs(wheelDelta) / 800, 0.15));
+-  return clampLogicalRange({ from: range.from + shift, to: range.to + shift }, barCount);
++  const next = clampLogicalRange({ from: range.from + shift, to: range.to + shift }, barCount);
++  if (!next) return null;
++  if (Math.abs(next.from - range.from) < 0.001 && Math.abs(next.to - range.to) < 0.001) {
++    return null;
++  }
++  return next;
++};
++
++export const chartWheelIntent = (event) => {
++  const horizontal = Math.abs(Number(event?.deltaX) || 0);
++  const vertical = Math.abs(Number(event?.deltaY) || 0);
++  if ((event?.ctrlKey || event?.metaKey) && vertical > horizontal * 1.5) return 'zoom';
++  return 'pan';
+ };
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index aaf3b6f..ab2bba5 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -8,10 +8,12 @@ import ChartSkeleton from './ChartSkeleton';
+ import { transformToCandlestickData } from './candlestickData';
+ import {
+   CHART_TIMEFRAMES,
++  chartWheelIntent,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
++  nextDailyHistoryPeriod,
+   pannedLogicalRange,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+@@ -80,6 +82,7 @@ function CandlestickChart({
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(true); // RS line overlay toggle
++  const [dailyHistoryPeriod, setDailyHistoryPeriod] = useState(period);
+   const [legendData, setLegendData] = useState(null); // OHLC legend data on hover
+   const [rsBandTop, setRsBandTop] = useState(0.66); // top margin of the live RS band
+   const theme = useTheme();
+@@ -87,8 +90,15 @@ function CandlestickChart({
+ 
+   const queryClient = useQueryClient();
+   const effectiveTimeframe = hideTimeframeToggle ? 'daily' : timeframe;
+-  const historyPeriod = historyPeriodForTimeframe(effectiveTimeframe, period);
+-  const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData);
++  const historyPeriod = effectiveTimeframe === 'daily'
++    ? dailyHistoryPeriod
++    : historyPeriodForTimeframe(effectiveTimeframe, period);
++  const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData)
++    && !(effectiveTimeframe === 'daily' && dailyHistoryPeriod !== period);
++
++  useEffect(() => {
++    setDailyHistoryPeriod(period);
++  }, [period, symbol]);
+ 
+   // Get any existing cached data for this symbol to use as placeholder
+   const getCachedData = () => {
+@@ -326,17 +336,34 @@ function CandlestickChart({
+       const timeScale = chartRef.current.timeScale();
+       const current = timeScale.getVisibleLogicalRange();
+       const barCount = chartData?.candlesticks?.length ?? 0;
+-      const next = event.ctrlKey
++      const intent = chartWheelIntent(event);
++      const wheelDelta = event.deltaX || event.deltaY;
++      const next = intent === 'zoom'
+         ? zoomedLogicalRange(current, event.deltaY < 0 ? 'in' : 'out', barCount)
+-        : pannedLogicalRange(current, event.deltaX || event.deltaY, barCount);
+-      if (!next) return;
++        : pannedLogicalRange(current, wheelDelta, barCount);
+       event.preventDefault();
++      if (!next) {
++        if (intent === 'pan' && wheelDelta < 0 && effectiveTimeframe === 'daily') {
++          const expandedPeriod = nextDailyHistoryPeriod(dailyHistoryPeriod);
++          if (expandedPeriod !== dailyHistoryPeriod) {
++            shouldRestoreRangeRef.current = true;
++            setDailyHistoryPeriod(expandedPeriod);
++          }
++        }
++        return;
++      }
+       timeScale.setVisibleLogicalRange(next);
+     };
+ 
+     container.addEventListener('wheel', handleWheel, { passive: false });
+     return () => container.removeEventListener('wheel', handleWheel);
+-  }, [chartData?.candlesticks?.length, compact, interactive]);
++  }, [
++    chartData?.candlesticks?.length,
++    compact,
++    dailyHistoryPeriod,
++    effectiveTimeframe,
++    interactive,
++  ]);
+ 
+   // Subscribe to visible time range changes
+   useEffect(() => {
+@@ -362,8 +389,8 @@ function CandlestickChart({
+     };
+   }, [onVisibleRangeChange, symbol]);
+ 
+-  // Cmd/Ctrl +/- changes the visible bar count. Mouse wheel, drag and pinch
+-  // continue to use Lightweight Charts' native interaction handlers.
++  // Cmd/Ctrl +/- changes the visible bar count. Trackpad pan and pinch are
++  // handled above so a two-finger slide never changes the visible bar count.
+   useEffect(() => {
+     if (compact || !interactive) return undefined;
+ 
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index ec32343..f0ecff1 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -1,14 +1,26 @@
+ import { describe, expect, it } from 'vitest';
+ import {
++  chartWheelIntent,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   historyPeriodForTimeframe,
++  nextDailyHistoryPeriod,
+   isDailyTimeframe,
+   pannedLogicalRange,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+ 
++describe('chartWheelIntent', () => {
++  it('keeps horizontal two-finger motion as pan even when a modifier leaks through', () => {
++    expect(chartWheelIntent({ ctrlKey: true, deltaX: 30, deltaY: 8 })).toBe('pan');
++  });
++
++  it('recognizes a vertical browser pinch gesture as zoom', () => {
++    expect(chartWheelIntent({ ctrlKey: true, deltaX: 0, deltaY: -12 })).toBe('zoom');
++  });
++});
++
+ describe('chart timeframe controls', () => {
+   it('loads only the history window needed by the selected view', () => {
+     expect(historyPeriodForTimeframe('five-day')).toBe('1mo');
+@@ -19,6 +31,13 @@ describe('chart timeframe controls', () => {
+     expect(historyPeriodForTimeframe('yearly')).toBe('10y');
+   });
+ 
++  it('expands daily history in bounded local steps', () => {
++    expect(nextDailyHistoryPeriod('6mo')).toBe('2y');
++    expect(nextDailyHistoryPeriod('2y')).toBe('5y');
++    expect(nextDailyHistoryPeriod('5y')).toBe('10y');
++    expect(nextDailyHistoryPeriod('10y')).toBe('10y');
++  });
++
+   it('keeps the RS overlay on the full daily view only', () => {
+     expect(isDailyTimeframe('five-day')).toBe(false);
+     expect(isDailyTimeframe('daily')).toBe(true);
+@@ -61,6 +80,6 @@ describe('chart timeframe controls', () => {
+   it('pans without changing scale and stops at either data edge', () => {
+     expect(pannedLogicalRange({ from: 20, to: 60 }, 100, 200)).toEqual({ from: 25, to: 65 });
+-    expect(pannedLogicalRange({ from: 0, to: 40 }, -100, 200)).toEqual({ from: 0, to: 40 });
+-    expect(pannedLogicalRange({ from: 159, to: 199 }, 100, 200)).toEqual({ from: 159, to: 199 });
++    expect(pannedLogicalRange({ from: 0, to: 40 }, -100, 200)).toBeNull();
++    expect(pannedLogicalRange({ from: 159, to: 199 }, 100, 200)).toBeNull();
+   });
+ });

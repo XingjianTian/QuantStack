@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "snapshot_id": "us-equity-research-2026-08-16.v1",
+  "as_of": "2026-08-16T00:00:00Z",
+  "source": "curated_research_snapshot",
+  "update_policy": "new_version",
+  "instruments": [
+    {"instrument_id": "XNAS.AAPL", "symbol": "AAPL", "canonical_venue": "XNAS", "provider_symbol": "AAPL", "name": "Apple Inc.", "listed_from": "1980-12-12", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.MSFT", "symbol": "MSFT", "canonical_venue": "XNAS", "provider_symbol": "MSFT", "name": "Microsoft Corporation", "listed_from": "1986-03-13", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNAS.NVDA", "symbol": "NVDA", "canonical_venue": "XNAS", "provider_symbol": "NVDA", "name": "NVIDIA Corporation", "listed_from": "1999-01-22", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.IBM", "symbol": "IBM", "canonical_venue": "XNYS", "provider_symbol": "IBM", "name": "International Business Machines Corporation", "listed_from": "1915-11-11", "status": "listed", "currency": "USD", "timezone": "America/New_York"},
+    {"instrument_id": "XNYS.JPM", "symbol": "JPM", "canonical_venue": "XNYS", "provider_symbol": "JPM", "name": "JPMorgan Chase & Co.", "listed_from": "1969-03-05", "status": "listed", "currency": "USD", "timezone": "America/New_York"}
+  ]
+}

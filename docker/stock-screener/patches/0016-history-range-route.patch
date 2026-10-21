@@ -1,0 +1,13 @@
+diff --git a/frontend/src/api/priceHistory.js b/frontend/src/api/priceHistory.js
+index 49e8ff9d..685dddaa 100644
+--- a/frontend/src/api/priceHistory.js
++++ b/frontend/src/api/priceHistory.js
+@@ -18,7 +18,7 @@ export const fetchPriceHistory = async (symbol, period = '6mo') => {
+ };
+ 
+ export const fetchPriceHistoryRange = async (symbol, start, end) => {
+-  const response = await apiClient.get(`/v1/stocks/${symbol}/history`, {
++  const response = await apiClient.get(`/v1/stocks/${symbol}/history-range`, {
+     params: { start, end },
+   });
+   return response.data;

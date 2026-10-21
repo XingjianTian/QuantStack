@@ -1,0 +1,287 @@
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -8,6 +8,7 @@
+ import { transformToCandlestickData } from './candlestickData';
+ import {
+   CHART_TIMEFRAMES,
++  chartPinchZoomDirection,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
+@@ -16,6 +17,7 @@
+   mergePriceHistory,
+   previousHistoryPage,
+   shouldPrefetchOlderHistory,
++  shiftedLogicalRangeAfterPrepend,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+@@ -83,6 +85,7 @@
+   const historyRequestPendingRef = useRef(false);
+   const historyExhaustedRef = useRef(false);
+   const historyDemandArmedRef = useRef(false);
++  const appliedCandlesRef = useRef([]);
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(() => defaultShowRsLine(symbol)); // RS line overlay toggle
+@@ -392,6 +395,21 @@
+     const timeScale = chart.timeScale();
+     const armHistoryDemand = () => {
+       historyDemandArmedRef.current = true;
++    };
++    const handleWheel = (event) => {
++      armHistoryDemand();
++      const direction = chartPinchZoomDirection(event);
++      if (!direction) return;
++      const current = timeScale.getVisibleLogicalRange();
++      const next = zoomedLogicalRange(
++        current,
++        direction,
++        chartData?.candlesticks?.length ?? 0,
++      );
++      if (!next) return;
++      event.preventDefault();
++      event.stopPropagation();
++      timeScale.setVisibleLogicalRange(next);
+     };
+     const handleLogicalRangeChange = (range) => {
+       if (!range) return;
+@@ -405,12 +423,12 @@
+       }
+     };
+ 
+-    container.addEventListener('wheel', armHistoryDemand, { passive: true });
++    container.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+     container.addEventListener('pointerdown', armHistoryDemand, { passive: true });
+     container.addEventListener('touchstart', armHistoryDemand, { passive: true });
+     timeScale.subscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+     return () => {
+-      container.removeEventListener('wheel', armHistoryDemand);
++      container.removeEventListener('wheel', handleWheel, { capture: true });
+       container.removeEventListener('pointerdown', armHistoryDemand);
+       container.removeEventListener('touchstart', armHistoryDemand);
+       timeScale.unsubscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+@@ -441,8 +459,8 @@
+     };
+   }, [onVisibleRangeChange, symbol]);
+ 
+-  // Cmd/Ctrl +/- changes the visible bar count. Native wheel, drag and pinch
+-  // stay enabled so the detail chart has the same continuous feel as Key Markets.
++  // Cmd/Ctrl +/- and explicit trackpad/touch pinch change the visible bar
++  // count. Ordinary horizontal wheel and drag remain pan-only.
+   useEffect(() => {
+     if (compact || !interactive) return undefined;
+ 
+@@ -474,8 +492,13 @@
+     }
+ 
+     const rangeBeforeUpdate = !isFirstDataLoadRef.current && !shouldRestoreRangeRef.current
+-      ? chartRef.current.timeScale().getVisibleRange()
++      ? chartRef.current.timeScale().getVisibleLogicalRange()
+       : null;
++    const shiftedRangeAfterUpdate = shiftedLogicalRangeAfterPrepend(
++      rangeBeforeUpdate,
++      appliedCandlesRef.current,
++      chartData.candlesticks,
++    );
+     const timeframeChanged = previousTimeframeRef.current !== effectiveTimeframe;
+     previousTimeframeRef.current = effectiveTimeframe;
+     if (timeframeChanged) fitTimeframeWhenSettledRef.current = true;
+@@ -489,6 +512,7 @@
+     if (candlestickSeriesRef.current && chartData.candlesticks.length > 0) {
+       candlestickSeriesRef.current.setData(chartData.candlesticks);
+     }
++    appliedCandlesRef.current = chartData.candlesticks;
+ 
+     // Update EMAs
+     if (ema10SeriesRef.current && chartData.ema10.length > 0) {
+@@ -554,11 +578,12 @@
+       isFirstDataLoadRef.current = false;
+       fitTimeframeWhenSettledRef.current = false;
+       chartRef.current.timeScale().fitContent();
+-    } else if (rangeBeforeUpdate) {
+-      // A refreshed response for the same timeframe preserves the user's viewport.
++    } else if (shiftedRangeAfterUpdate) {
++      // Preserve the exact logical span. Older bars shift existing indices to
++      // the right, including any blank loading runway currently in view.
+       setTimeout(() => {
+         if (chartRef.current) {
+-          chartRef.current.timeScale().setVisibleRange(rangeBeforeUpdate);
++          chartRef.current.timeScale().setVisibleLogicalRange(shiftedRangeAfterUpdate);
+         }
+       }, 0);
+     }
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -14,6 +14,14 @@
+ 
+ export const defaultShowRsLine = (symbol) => !/\.(SS|SZ)$/i.test(symbol || '');
+ 
++export const chartPinchZoomDirection = (event) => {
++  if (!event?.ctrlKey && !event?.metaKey) return null;
++  const horizontal = Math.abs(Number(event.deltaX) || 0);
++  const vertical = Number(event.deltaY) || 0;
++  if (vertical === 0 || Math.abs(vertical) <= horizontal) return null;
++  return vertical < 0 ? 'in' : 'out';
++};
++
+ export const STREAMING_HISTORY_PAGE_DAYS = 400;
+ export const STREAMING_HISTORY_PREFETCH_BARS = 50;
+ 
+@@ -59,6 +67,24 @@
+     .map(([, point]) => point);
+ };
+ 
++export const shiftedLogicalRangeAfterPrepend = (range, previousCandles, nextCandles) => {
++  if (
++    !range
++    || !Number.isFinite(range.from)
++    || !Number.isFinite(range.to)
++    || range.to <= range.from
++  ) return null;
++
++  const previousFirstTime = previousCandles?.[0]?.time;
++  const prependCount = previousFirstTime == null
++    ? 0
++    : Math.max(0, (nextCandles || []).findIndex((point) => point?.time === previousFirstTime));
++  return {
++    from: range.from + prependCount,
++    to: range.to + prependCount,
++  };
++};
++
+ export const isDailyTimeframe = (timeframe) => timeframe === 'daily';
+ 
+ export const usesBundledPriceData = (timeframe, priceData) => (
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -1,5 +1,6 @@
+ import { describe, expect, it } from 'vitest';
+ import {
++  chartPinchZoomDirection,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
+@@ -8,10 +9,20 @@
+   mergePriceHistory,
+   previousHistoryPage,
+   shouldPrefetchOlderHistory,
++  shiftedLogicalRangeAfterPrepend,
+   usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+ 
++describe('chart gesture semantics', () => {
++  it('recognizes only modifier-backed vertical wheel as trackpad pinch', () => {
++    expect(chartPinchZoomDirection({ ctrlKey: true, deltaX: 0, deltaY: -12 })).toBe('in');
++    expect(chartPinchZoomDirection({ metaKey: true, deltaX: 0, deltaY: 12 })).toBe('out');
++    expect(chartPinchZoomDirection({ deltaX: 40, deltaY: 0 })).toBeNull();
++    expect(chartPinchZoomDirection({ ctrlKey: true, deltaX: 40, deltaY: 8 })).toBeNull();
++  });
++});
++
+ describe('chart timeframe controls', () => {
+   it('loads only the history window needed by the selected view', () => {
+     expect(historyPeriodForTimeframe('five-day')).toBe('1mo');
+@@ -56,6 +67,21 @@
+     ]);
+   });
+ 
++  it('shifts a logical viewport by the prepend count without changing its span', () => {
++    const previous = [
++      { time: '2026-03-01' },
++      { time: '2026-03-02' },
++    ];
++    const next = [
++      { time: '2026-02-27' },
++      { time: '2026-02-28' },
++      ...previous,
++    ];
++    const shifted = shiftedLogicalRangeAfterPrepend({ from: -20, to: 40 }, previous, next);
++    expect(shifted).toEqual({ from: -18, to: 42 });
++    expect(shifted.to - shifted.from).toBe(60);
++  });
++
+   it('keeps the RS overlay on the full daily view only', () => {
+     expect(isDailyTimeframe('five-day')).toBe(false);
+     expect(isDailyTimeframe('daily')).toBe(true);
+--- a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -8,6 +8,10 @@
+ const chartHarness = vi.hoisted(() => ({
+   logicalRangeHandler: null,
+   fetchRange: vi.fn(),
++  fitContent: vi.fn(),
++  getVisibleLogicalRange: vi.fn(() => ({ from: 0, to: 1 })),
++  setVisibleRange: vi.fn(),
++  setVisibleLogicalRange: vi.fn(),
+ }));
+ 
+ vi.mock('../../api/priceHistory', () => ({
+@@ -32,11 +36,11 @@
+     priceScale: () => ({ applyOptions: vi.fn() }),
+   });
+   const timeScale = {
+-    fitContent: vi.fn(),
++    fitContent: chartHarness.fitContent,
+     getVisibleRange: vi.fn(() => ({ from: '2026-03-01', to: '2026-03-02' })),
+-    getVisibleLogicalRange: vi.fn(() => ({ from: 0, to: 1 })),
+-    setVisibleRange: vi.fn(),
+-    setVisibleLogicalRange: vi.fn(),
++    getVisibleLogicalRange: chartHarness.getVisibleLogicalRange,
++    setVisibleRange: chartHarness.setVisibleRange,
++    setVisibleLogicalRange: chartHarness.setVisibleLogicalRange,
+     subscribeVisibleLogicalRangeChange: vi.fn((handler) => {
+       chartHarness.logicalRangeHandler = handler;
+     }),
+@@ -79,6 +83,11 @@
+   beforeEach(() => {
+     chartHarness.logicalRangeHandler = null;
+     chartHarness.fetchRange.mockReset();
++    chartHarness.fitContent.mockReset();
++    chartHarness.getVisibleLogicalRange.mockReset();
++    chartHarness.getVisibleLogicalRange.mockReturnValue({ from: 0, to: 1 });
++    chartHarness.setVisibleRange.mockReset();
++    chartHarness.setVisibleLogicalRange.mockReset();
+     chartHarness.fetchRange.mockImplementation(() => new Promise(() => {}));
+     globalThis.ResizeObserver = class {
+       observe() {}
+@@ -106,4 +115,38 @@
+       expect.objectContaining({ signal: expect.any(AbortSignal) }),
+     );
+   });
++
++  it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
++    chartHarness.fetchRange.mockResolvedValue([
++      { date: '2026-02-27', open: 8, high: 10, low: 7, close: 9, volume: 80 },
++      { date: '2026-02-28', open: 9, high: 11, low: 8, close: 10, volume: 90 },
++    ]);
++    renderChart();
++
++    await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
++    await screen.findByText('12.00');
++    chartHarness.fitContent.mockClear();
++    chartHarness.setVisibleRange.mockClear();
++    chartHarness.setVisibleLogicalRange.mockClear();
++    chartHarness.getVisibleLogicalRange.mockReturnValue({ from: -20, to: 40 });
++
++    const canvas = screen.getByTestId('candlestick-chart-canvas');
++    fireEvent.wheel(canvas, { deltaX: 40, deltaY: 0 });
++    expect(chartHarness.setVisibleLogicalRange).not.toHaveBeenCalled();
++    chartHarness.logicalRangeHandler({ from: -20, to: 40 });
++
++    await waitFor(() => expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledWith({
++      from: -18,
++      to: 42,
++    }));
++    expect(chartHarness.fitContent).not.toHaveBeenCalled();
++    expect(chartHarness.setVisibleRange).not.toHaveBeenCalled();
++
++    chartHarness.setVisibleLogicalRange.mockClear();
++    chartHarness.getVisibleLogicalRange.mockReturnValue({ from: 20, to: 80 });
++    fireEvent.wheel(canvas, { ctrlKey: true, deltaX: 0, deltaY: -12 });
++    expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
++    const pinched = chartHarness.setVisibleLogicalRange.mock.calls[0][0];
++    expect(pinched.to - pinched.from).toBeLessThan(60);
++  });
+ });

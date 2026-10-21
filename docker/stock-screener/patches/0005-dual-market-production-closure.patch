@@ -1,0 +1,281 @@
+diff --git a/frontend/src/components/Layout/MarketSelector.jsx b/frontend/src/components/Layout/MarketSelector.jsx
+index 5a00419b..b7295943 100644
+--- a/frontend/src/components/Layout/MarketSelector.jsx
++++ b/frontend/src/components/Layout/MarketSelector.jsx
+@@ -1,10 +1,18 @@
+ import { MenuItem, Select } from '@mui/material';
++import { useNavigate } from 'react-router-dom';
+ 
+ import { useMarket } from '../../contexts/MarketContext';
+ import { marketFlag } from '../../utils/marketFlags';
+ 
+ function MarketSelector() {
+   const { selectedMarket, setSelectedMarket, selectableMarkets, marketLabel } = useMarket();
++  const navigate = useNavigate();
++
++  const handleChange = (event) => {
++    const market = event.target.value;
++    setSelectedMarket(market);
++    navigate({ pathname: '/', search: `?market=${encodeURIComponent(market)}` });
++  };
+ 
+   if (selectableMarkets.length < 2) {
+     return null;
+@@ -13,7 +21,7 @@ function MarketSelector() {
+   return (
+     <Select
+       value={selectedMarket}
+-      onChange={(event) => setSelectedMarket(event.target.value)}
++      onChange={handleChange}
+       size="small"
+       variant="standard"
+       disableUnderline
+diff --git a/frontend/src/components/Scan/PeerComparisonModal.jsx b/frontend/src/components/Scan/PeerComparisonModal.jsx
+index 589de37c..e3249734 100644
+--- a/frontend/src/components/Scan/PeerComparisonModal.jsx
++++ b/frontend/src/components/Scan/PeerComparisonModal.jsx
+@@ -28,6 +28,7 @@ import { getStockPeers } from '../../api/stocks';
+ import RSSparkline from './RSSparkline';
+ import AddToWatchlistMenu from '../common/AddToWatchlistMenu';
+ import { getStageColor } from '../../utils/colorUtils';
++import { formatLocalCurrency } from '../../utils/formatUtils';
+ 
+ /**
+  * Fetch peer stocks — scan-based when scanId is provided, standalone otherwise.
+@@ -329,7 +330,7 @@ function PeerComparisonModal({ open, onClose, scanId, symbol, onOpenChart }) {
+ 
+                       <TableCell align="center">
+                         <Typography variant="body2">
+-                          {peer.current_price ? `$${peer.current_price.toFixed(2)}` : '-'}
++                          {formatLocalCurrency(peer.current_price, peer.currency)}
+                         </Typography>
+                       </TableCell>
+ 
+diff --git a/frontend/src/components/Scan/StockMetricsSidebar.jsx b/frontend/src/components/Scan/StockMetricsSidebar.jsx
+index db3f5e03..d54a0daf 100644
+--- a/frontend/src/components/Scan/StockMetricsSidebar.jsx
++++ b/frontend/src/components/Scan/StockMetricsSidebar.jsx
+@@ -12,7 +12,13 @@ import {
+   getGrowthColorHex,
+   getEpsRatingColor,
+ } from '../../utils/colorUtils';
+-import { formatPercent, formatRatio, formatPatternName, getScoreColor } from '../../utils/formatUtils';
++import {
++  formatLocalCurrency,
++  formatPercent,
++  formatRatio,
++  formatPatternName,
++  getScoreColor,
++} from '../../utils/formatUtils';
+ import { resolveMarketCapDisplay } from '../../utils/marketCapUtils';
+ 
+ // Alias for this component's usage (uses hex colors)
+@@ -457,7 +463,7 @@ function StockMetricsSidebar({
+         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5 }}>
+           <MetricRow
+             label="Price"
+-            value={stockData.current_price ? `$${stockData.current_price.toFixed(2)}` : '-'}
++            value={formatLocalCurrency(stockData.current_price, stockData.currency)}
+           />
+           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+diff --git a/frontend/src/components/Scan/StockMetricsSidebar.test.jsx b/frontend/src/components/Scan/StockMetricsSidebar.test.jsx
+index 7dc6c50e..200732b3 100644
+--- a/frontend/src/components/Scan/StockMetricsSidebar.test.jsx
++++ b/frontend/src/components/Scan/StockMetricsSidebar.test.jsx
+@@ -5,6 +5,22 @@ import { renderWithProviders } from '../../test/renderWithProviders';
+ import StockMetricsSidebar from './StockMetricsSidebar';
+ 
+ describe('StockMetricsSidebar market-cap display', () => {
++  it('uses the row currency for the detail price', () => {
++    renderWithProviders(
++      <StockMetricsSidebar
++        stockData={{
++          symbol: '603186.SS',
++          currency: 'CNY',
++          current_price: 81.73,
++        }}
++        fundamentals={null}
++      />
++    );
++
++    expect(screen.getByText('¥81.73')).toBeInTheDocument();
++    expect(screen.queryByText('$81.73')).not.toBeInTheDocument();
++  });
++
+   it('falls back to scan-row market cap when fundamentals market cap is missing', () => {
+     renderWithProviders(
+       <StockMetricsSidebar
+diff --git a/frontend/src/features/scan/pages/ScanPageContainer.jsx b/frontend/src/features/scan/pages/ScanPageContainer.jsx
+index 24e162dc..de1c7850 100644
+--- a/frontend/src/features/scan/pages/ScanPageContainer.jsx
++++ b/frontend/src/features/scan/pages/ScanPageContainer.jsx
+@@ -77,6 +77,7 @@ function ScanPage() {
+   // market re-arms the auto-load for the new market. The sentinel can never
+   // collide with a market code or with null (the no-provider market value).
+   const autoLoadedMarketRef = useRef(NO_MARKET_AUTOLOADED);
++  const universeSyncedMarketRef = useRef(null);
+   const globalMarketRef = useRef(globalMarket);
+   globalMarketRef.current = globalMarket;
+   const scanHistoryRef = useRef([]);
+@@ -130,6 +131,26 @@ function ScanPage() {
+     scanDefaultsAppliedRef.current = profileKey;
+   }, [activeProfileDetail, runtimeReady, scanDefaults, universeSelections]);
+ 
++  // The header market is the product-level context. Run this after profile
++  // defaults so an intentionally ambiguous legacy "all" default cannot reset
++  // the picker to empty after CN/US has already been selected globally.
++  useEffect(() => {
++    if (!runtimeReady || !globalMarket || universeSyncedMarketRef.current === globalMarket) {
++      return;
++    }
++    const scopes = universeSelections?.scopesByMarket?.[globalMarket] ?? [];
++    const defaultScope = scopes.find((option) => (
++      !option.disabled
++      && option.universe_def?.type === 'market'
++      && option.universe_def?.market === globalMarket
++      && !option.universe_def?.mic
++      && !option.universe_def?.listing_tier
++    )) ?? scopes.find((option) => !option.disabled);
++    universeSyncedMarketRef.current = globalMarket;
++    setUniverseMarket(globalMarket);
++    setUniverseScope(defaultScope?.value ?? 'market');
++  }, [globalMarket, runtimeReady, universeSelections]);
++
+   useEffect(() => {
+     if (!universeMarket || !universeScope) {
+       return;
+diff --git a/frontend/src/pages/GroupRankingsPage.jsx b/frontend/src/pages/GroupRankingsPage.jsx
+index dd4f75d4..4be4e9c0 100644
+--- a/frontend/src/pages/GroupRankingsPage.jsx
++++ b/frontend/src/pages/GroupRankingsPage.jsx
+@@ -742,6 +742,7 @@ function GroupRankingsPage() {
+   );
+ 
+   if (errorRankings && !isRrgView) {
++    const noPublishedRankings = errorRankings?.response?.status === 404;
+     return (
+       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+         {features.tasks && selectedMarket === 'US' && (
+@@ -756,8 +757,10 @@ function GroupRankingsPage() {
+             </Button>
+           </Box>
+         )}
+-        <Alert severity="error">
+-          Error loading rankings: {errorRankings.message}
++        <Alert severity={noPublishedRankings ? 'info' : 'error'}>
++          {noPublishedRankings
++            ? `No group rankings have been published for ${selectedMarket} yet.`
++            : `Error loading rankings: ${errorRankings.message}`}
+         </Alert>
+         {renderCalculationErrorAlert({ mt: 1 })}
+       </Container>
+diff --git a/frontend/src/pages/GroupRankingsPage.test.jsx b/frontend/src/pages/GroupRankingsPage.test.jsx
+index 277580ca..77a14b97 100644
+--- a/frontend/src/pages/GroupRankingsPage.test.jsx
++++ b/frontend/src/pages/GroupRankingsPage.test.jsx
+@@ -1,13 +1,18 @@
+ import { fireEvent, screen, waitFor } from '@testing-library/react';
+ import userEvent from '@testing-library/user-event';
+ import { describe, expect, it, vi, beforeEach } from 'vitest';
+-import { MemoryRouter } from 'react-router-dom';
++import { MemoryRouter, useLocation } from 'react-router-dom';
+ 
+ import { renderWithProviders } from '../test/renderWithProviders';
+ import MarketSelector from '../components/Layout/MarketSelector';
+ import { MarketProvider } from '../contexts/MarketContext';
+ import GroupRankingsPage from './GroupRankingsPage';
+ 
++function LocationProbe() {
++  const location = useLocation();
++  return <div data-testid="location-probe">{location.pathname}{location.search}</div>;
++}
++
+ // Render the page alongside the global header market selector, mirroring the
+ // app layout (the per-page market toggle was replaced by MarketSelector).
+ function renderGroupRankingsPage() {
+@@ -15,6 +20,7 @@ function renderGroupRankingsPage() {
+     <MemoryRouter>
+       <MarketProvider>
+         <MarketSelector />
++        <LocationProbe />
+         <GroupRankingsPage />
+       </MarketProvider>
+     </MemoryRouter>
+@@ -199,11 +205,26 @@ describe('GroupRankingsPage', () => {
+     await waitFor(() => {
+       expect(getCurrentRankings).toHaveBeenCalledWith(197, 'US');
+     });
++    expect(screen.getByTestId('location-probe')).toHaveTextContent('/?market=US');
+     expect(getRankMovers).toHaveBeenCalledWith('1w', 10, 'US');
+     expect(await screen.findByText('US Internet Services')).toBeInTheDocument();
+     expect(screen.getByText('US | 1 groups | 2026-04-18')).toBeInTheDocument();
+   });
+ 
++  it('renders unpublished rankings as an informative empty state', async () => {
++    getCurrentRankings.mockRejectedValueOnce({
++      response: { status: 404 },
++      message: 'Request failed with status code 404',
++    });
++
++    renderGroupRankingsPage();
++
++    expect(
++      await screen.findByText('No group rankings have been published for HK yet.')
++    ).toBeInTheDocument();
++    expect(screen.queryByText(/Error loading rankings/)).not.toBeInTheDocument();
++  });
++
+   it('keeps the market filter visible on non-US load errors and hides the US-only calculation action', async () => {
+     runtimeState.features = { tasks: true };
+     getCurrentRankings.mockImplementation(async (_limit, market = 'US') => {
+diff --git a/frontend/src/pages/ScanPage.test.jsx b/frontend/src/pages/ScanPage.test.jsx
+index 72d02db6..5d859f10 100644
+--- a/frontend/src/pages/ScanPage.test.jsx
++++ b/frontend/src/pages/ScanPage.test.jsx
+@@ -16,6 +16,7 @@ const runtimeState = {
+   universeOptions: null,
+ };
+ const useRuntimeActivityMock = vi.hoisted(() => vi.fn());
++const marketState = vi.hoisted(() => ({ selectedMarket: null }));
+ const STALE_TAIL_WARNING = {
+   code: 'market_data_stale_tail_omitted',
+   message: 'Omitted 1 stale symbol from this broad scan (99.00% fresh).',
+@@ -27,6 +28,10 @@ vi.mock('../contexts/RuntimeContext', () => ({
+   useRuntime: () => runtimeState,
+ }));
+ 
++vi.mock('../contexts/MarketContext', () => ({
++  useMarket: () => marketState,
++}));
++
+ vi.mock('../hooks/useRuntimeActivity', () => ({
+   useRuntimeActivity: (...args) => useRuntimeActivityMock(...args),
+ }));
+@@ -76,6 +81,7 @@ beforeEach(() => {
+   runtimeState.uiSnapshots = { scan: false };
+   runtimeState.scanDefaults = DEFAULT_SCAN_DEFAULTS;
+   runtimeState.universeOptions = null;
++  marketState.selectedMarket = null;
+   useRuntimeActivityMock.mockReset();
+   useRuntimeActivityMock.mockReturnValue({
+     data: {
+@@ -102,6 +108,18 @@ describe('ScanPage', () => {
+     expect(screen.getByRole('progressbar')).toBeInTheDocument();
+   });
+ 
++  it('uses the global market as an immediately scannable whole-market universe', async () => {
++    runtimeState.runtimeReady = true;
++    marketState.selectedMarket = 'CN';
++
++    renderWithProviders(<ScanPage />);
++
++    await waitFor(() => {
++      expect(screen.getByRole('button', { name: 'Scan' })).toBeEnabled();
++    });
++    expect(screen.queryByText('Pick a market to start')).not.toBeInTheDocument();
++  });
++
+   it('hydrates scan controls from runtime scan defaults', async () => {
+     runtimeState.runtimeReady = true;
+     runtimeState.scanDefaults = {

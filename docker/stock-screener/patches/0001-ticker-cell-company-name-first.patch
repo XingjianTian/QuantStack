@@ -1,0 +1,100 @@
+diff --git a/frontend/src/components/common/TickerCell.jsx b/frontend/src/components/common/TickerCell.jsx
+index ad8344fd..c6be21e6 100644
+--- a/frontend/src/components/common/TickerCell.jsx
++++ b/frontend/src/components/common/TickerCell.jsx
+@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
+ function TickerCell({ symbol, companyName, align = 'left' }) {
+   const alignItems = align === 'center' ? 'center' : 'flex-start';
+   const textAlign = align === 'center' ? 'center' : 'left';
++  const displayName = companyName?.trim();
+
+   if (!symbol) {
+     return (
+@@ -37,30 +38,41 @@ function TickerCell({ symbol, companyName, align = 'left' }) {
+         minWidth: 0,
+       }}
+     >
+-      <Typography
+-        component="span"
+-        variant="body2"
+-        sx={{ fontWeight: 600, lineHeight: 1.2 }}
+-      >
+-        {symbol}
+-      </Typography>
+-      {companyName ? (
++      {displayName ? (
+         <Typography
+-          variant="caption"
+-          color="text.secondary"
++          component="span"
++          variant="body2"
+           noWrap
+-          title={companyName}
++          title={displayName}
+           sx={{
+-            display: 'block',
+-            lineHeight: 1.2,
+-            minWidth: 0,
+             maxWidth: '100%',
++            fontWeight: 600,
++            lineHeight: 1.2,
+             textAlign,
+           }}
+         >
+-          {companyName}
++          {displayName}
+         </Typography>
+       ) : null}
++      <Typography
++        component="span"
++        variant={displayName ? 'caption' : 'body2'}
++        color={displayName ? 'text.secondary' : 'text.primary'}
++        noWrap={Boolean(displayName)}
++        title={displayName ? symbol : undefined}
++        sx={{
++          display: 'block',
++          minWidth: 0,
++          maxWidth: '100%',
++          fontFamily: displayName ? 'monospace' : undefined,
++          fontWeight: displayName ? 400 : 600,
++          lineHeight: 1.2,
++          letterSpacing: displayName ? '0.02em' : undefined,
++          textAlign,
++        }}
++      >
++        {symbol}
++      </Typography>
+     </Box>
+   );
+ }
+diff --git a/frontend/src/components/common/TickerCell.test.jsx b/frontend/src/components/common/TickerCell.test.jsx
+new file mode 100644
+index 00000000..fe283421
+--- /dev/null
++++ b/frontend/src/components/common/TickerCell.test.jsx
+@@ -0,0 +1,25 @@
++import '@testing-library/jest-dom/vitest';
++import { render } from '@testing-library/react';
++import { describe, expect, it } from 'vitest';
++
++import TickerCell from './TickerCell';
++
++describe('TickerCell downstream name-first hierarchy', () => {
++  it('renders the company name before the secondary ticker code', () => {
++    const { container } = render(
++      <TickerCell symbol="001258.SZ" companyName="立新能源" align="center" />
++    );
++
++    const labels = Array.from(container.querySelectorAll('span')).map((node) => node.textContent);
++    expect(labels).toEqual(['立新能源', '001258.SZ']);
++    expect(container.querySelector('span[title="立新能源"]')).toBeInTheDocument();
++    expect(container.querySelector('span[title="001258.SZ"]')).toBeInTheDocument();
++  });
++
++  it('keeps the ticker code as the primary label when no company name exists', () => {
++    const { container } = render(<TickerCell symbol="001258.SZ" />);
++
++    const labels = Array.from(container.querySelectorAll('span')).map((node) => node.textContent);
++    expect(labels).toEqual(['001258.SZ']);
++  });
++});

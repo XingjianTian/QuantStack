@@ -1,0 +1,179 @@
+name: personal-quant-platform
+
+services:
+  quant-api:
+    image: personal/quant-stack-api:0.5.1
+    container_name: quant-stack-api
+    environment:
+      QUANT_API_KEY: ${QUANT_API_KEY:?Set QUANT_API_KEY in the private .env}
+      QUANT_STACK_ROOT: /app
+      QUANT_DATA_ROOT: /quant-data
+      QUANT_EXPERIMENT_ROOT: /quant-data/experiments
+      QUANT_US_INDEX_ROOT: /quant-data/us-market-indexes
+      QUANT_API_HOST: 0.0.0.0
+      QUANT_API_PORT: 8900
+      QUANT_CENTER_VIBE_URL: ${QUANT_CENTER_VIBE_URL:?Set QUANT_CENTER_VIBE_URL in .env}
+      QUANT_CENTER_SCREENER_URL: ${QUANT_CENTER_SCREENER_URL:?Set QUANT_CENTER_SCREENER_URL in .env}
+      QUANT_CENTER_NAUTILUS_URL: ${QUANT_CENTER_NAUTILUS_URL:?Set QUANT_CENTER_NAUTILUS_URL in .env}
+      QUANT_CENTER_WEB_HEALTH_URL: ${QUANT_CENTER_WEB_HEALTH_URL:?Set QUANT_CENTER_WEB_HEALTH_URL in .env}
+      QUANT_CENTER_VIBE_HEALTH_URL: ${QUANT_CENTER_VIBE_HEALTH_URL:?Set QUANT_CENTER_VIBE_HEALTH_URL in .env}
+      QUANT_CENTER_SCREENER_HEALTH_URL: ${QUANT_CENTER_SCREENER_HEALTH_URL:?Set QUANT_CENTER_SCREENER_HEALTH_URL in .env}
+      QUANT_CENTER_NAUTILUS_HEALTH_URL: ${QUANT_CENTER_NAUTILUS_HEALTH_URL:?Set QUANT_CENTER_NAUTILUS_HEALTH_URL in .env}
+    networks:
+      - default
+      - screener
+    ports:
+      - "${QUANT_BIND_ADDRESS:-127.0.0.1}:${QUANT_API_PUBLISHED_PORT:-18900}:8900"
+    volumes:
+      - ${QUANT_DOCKER_DATA_ROOT:-./data}:/quant-data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 2g
+    cpus: 1.5
+    pids_limit: 256
+    restart: unless-stopped
+
+  center-web:
+    image: personal/quant-center-web:0.9.14
+    container_name: quant-center-web
+    depends_on:
+      quant-api:
+        condition: service_healthy
+    secrets:
+      - quant_api_key
+    group_add:
+      - "${QUANT_SECRET_GID:-1004}"
+    ports:
+      - "${QUANT_BIND_ADDRESS:-127.0.0.1}:${QUANT_CENTER_PUBLISHED_PORT:-18920}:8080"
+    read_only: true
+    tmpfs:
+      - /etc/nginx/conf.d
+      - /var/cache/nginx
+      - /var/run
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 96
+    restart: unless-stopped
+
+  brokerage-sample:
+    image: personal/quant-brokerage-sample:0.1.0
+    container_name: quant-brokerage-sample
+    # No published port: Nginx reaches this fixture-only service on loopback.
+    network_mode: service:center-web
+    depends_on:
+      center-web:
+        condition: service_healthy
+    environment:
+      QUANT_SAMPLE_SITE_ORIGIN: ${QUANT_SAMPLE_SITE_ORIGIN:?Set QUANT_SAMPLE_SITE_ORIGIN in .env}
+    volumes:
+      - brokerage-sample-state:/sample-state
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 96
+    restart: unless-stopped
+
+  nautilus-lab-web:
+    image: personal/nautilus-lab-web:0.4.0
+    container_name: quant-nautilus-lab-web
+    depends_on:
+      quant-api:
+        condition: service_healthy
+    secrets:
+      - quant_api_key
+    group_add:
+      - "${QUANT_SECRET_GID:-1004}"
+    ports:
+      - "${QUANT_BIND_ADDRESS:-127.0.0.1}:${QUANT_NAUTILUS_PUBLISHED_PORT:-18930}:8080"
+    read_only: true
+    tmpfs:
+      - /etc/nginx/conf.d
+      - /var/cache/nginx
+      - /var/run
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 96
+    restart: unless-stopped
+
+  vibe-web:
+    image: personal/vibe-trading-quant:0.7.0
+    container_name: quant-vibe-web
+    env_file:
+      - path: ${QUANT_VIBE_ENV_FILE:-./secrets/vibe.env}
+        required: false
+    environment:
+      API_AUTH_KEY: ${VIBE_API_AUTH_KEY:?Set VIBE_API_AUTH_KEY in the private .env}
+      VIBE_TRADING_TRUST_DOCKER_LOOPBACK: "1"
+      OAUTH_CLI_KIT_TOKEN_PATH: /home/vibe/.vibe-trading/oauth/openai-codex.json
+      API_ALLOWED_HOSTS: ${QUANT_VIBE_PUBLIC_HOST:-vibe-trading.example.com}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "${QUANT_BIND_ADDRESS:-127.0.0.1}:${QUANT_VIBE_PUBLISHED_PORT:-18899}:8899"
+    volumes:
+      - vibe-runs:/app/agent/runs
+      - vibe-sessions:/app/agent/sessions
+      - vibe-home:/home/vibe/.vibe-trading
+      - vibe-swarm-runs:/app/agent/.swarm/runs
+      - vibe-uploads:/app/agent/uploads
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/vibe/.cache
+      - /home/vibe/.config
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 3g
+    cpus: 1.5
+    pids_limit: 512
+    restart: unless-stopped
+
+volumes:
+  brokerage-sample-state:
+  vibe-runs:
+  vibe-sessions:
+  vibe-home:
+  vibe-swarm-runs:
+  vibe-uploads:
+
+networks:
+  screener:
+    external: true
+    name: ${QUANT_SCREENER_NETWORK:-quant-workspace_default}
+
+secrets:
+  quant_api_key:
+    file: ${QUANT_API_KEY_FILE:-./secrets/quant-api-key}

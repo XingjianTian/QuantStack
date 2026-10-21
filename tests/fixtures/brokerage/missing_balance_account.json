@@ -1,0 +1,13 @@
+{
+  "securitiesAccount": {
+    "accountId": "fictional-account",
+    "accountHash": "fictional-account-hash",
+    "type": "CASH",
+    "currency": "USD",
+    "nickname": "Fictional Missing Funds Sample",
+    "currentBalances": {
+      "cashBalance": "500.00"
+    },
+    "positions": []
+  }
+}

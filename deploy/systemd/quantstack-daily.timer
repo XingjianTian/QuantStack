@@ -1,0 +1,11 @@
+[Unit]
+Description=Run QuantStack daily increment after BaoStock daily data release
+
+[Timer]
+OnCalendar=*-*-* 18:00:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=0
+Unit=quantstack-daily.service
+
+[Install]
+WantedBy=timers.target

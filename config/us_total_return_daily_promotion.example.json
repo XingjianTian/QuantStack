@@ -1,0 +1,16 @@
+{
+  "schema_version": "quantstack.us-total-return-daily-promotion.v1",
+  "snapshot": "${QUANT_US_INSTRUMENT_SNAPSHOT}",
+  "isolated_root": "${QUANT_DATA_ROOT}/us-equity-isolated",
+  "session_parquet_root": "${QUANT_DATA_ROOT}/daily-session-parquet",
+  "action_evidence_root": "${QUANT_RUNTIME_ROOT}/us-equity-daily/action-evidence",
+  "data_root": "${QUANT_DATA_ROOT}",
+  "work_root": "${QUANT_RUNTIME_ROOT}/us-total-return-daily-promotion",
+  "state": "${QUANT_RUNTIME_ROOT}/us-total-return-daily-promotion/state.json",
+  "initial_watermark": "2026-08-26",
+  "dataset_version_prefix": "2016-2026.full-market-v2.total-return-ss-daily-v1",
+  "ss_base_url": "${QUANT_SCREENER_BASE_URL}",
+  "ss_report_root": "${QUANT_RUNTIME_ROOT}/us-total-return-daily-promotion/ss-reports",
+  "ss_report_gid": 1000,
+  "recovery_sessions": {}
+}

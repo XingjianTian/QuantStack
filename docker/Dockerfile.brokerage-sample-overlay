@@ -1,0 +1,21 @@
+ARG BASE_IMAGE=personal/quant-stack-api:0.5.1
+FROM ${BASE_IMAGE}
+USER root
+WORKDIR /app
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY tests/fixtures/brokerage ./tests/fixtures/brokerage
+RUN uv sync --frozen --no-dev --extra brokerage \
+    && mkdir -p /sample-state \
+    && chown quant:quant /sample-state \
+    && chmod 0700 /sample-state
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONPATH="/app/src:/app" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    QUANT_SAMPLE_RUNTIME_ROOT=/sample-state
+USER quant
+LABEL org.opencontainers.image.version="0.1.0"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8917/v1/brokerage-sample/state')" || exit 1
+CMD ["python", "-m", "quant_stack.brokerage_sample_api"]

@@ -1,0 +1,13 @@
+[
+  {
+    "symbol": "AAPL",
+    "instrument_id": "XNAS.AAPL",
+    "ts_event": "2026-07-20T20:00:00+00:00",
+    "open": 100.0,
+    "high": 99.0,
+    "low": 98.0,
+    "close": 101.0,
+    "volume": 1000.0,
+    "currency": "USD"
+  }
+]

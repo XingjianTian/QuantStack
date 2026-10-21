@@ -1,0 +1,14 @@
+{
+  "fixture_kind": "offline_provider_replay",
+  "provider": "akshare",
+  "endpoint": "stock_zh_a_spot_em",
+  "records": [
+    {"instrument_id": "XSHG.600000", "symbol": "600000", "provider_symbol": "600000", "provider_exchange_alias": "SH", "venue": "XSHG", "name": "Pudong Development Bank", "active": true},
+    {"instrument_id": "XSHE.000001", "symbol": "000001", "provider_symbol": "000001", "provider_exchange_alias": "SZ", "venue": "XSHE", "name": "Ping An Bank", "active": true},
+    {"instrument_id": "BJSE.430047", "symbol": "430047", "provider_symbol": "430047", "provider_exchange_alias": "BJ", "venue": "BJSE", "name": "Novogene", "active": true},
+    {"instrument_id": "XSHG.688001", "symbol": "688001", "provider_symbol": "688001", "provider_exchange_alias": "SH", "venue": "XSHG", "name": "STAR Board Fixture", "active": true},
+    {"instrument_id": "XSHE.300001", "symbol": "300001", "provider_symbol": "300001", "provider_exchange_alias": "SZ", "venue": "XSHE", "name": "ChiNext Fixture", "active": true},
+    {"instrument_id": "XSHG.600001", "symbol": "600001", "provider_symbol": "600001", "provider_exchange_alias": "SH", "venue": "XSHG", "name": "ST Suspension Fixture", "active": true},
+    {"instrument_id": "BJSE.920001", "symbol": "920001", "provider_symbol": "920001", "provider_exchange_alias": "BJ", "venue": "BJSE", "name": "Recent Listing Fixture", "active": true}
+  ]
+}

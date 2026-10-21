@@ -1,0 +1,33 @@
+diff --git a/frontend/src/components/Scan/ChartViewerModal.jsx b/frontend/src/components/Scan/ChartViewerModal.jsx
+--- a/frontend/src/components/Scan/ChartViewerModal.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.jsx
+@@ -273,6 +273,10 @@ function ChartViewerModal({
+   // symbols in the same group).
+   useEffect(() => {
+     if (!open || !currentSymbol || chartReadySymbol !== currentSymbol || !navigationSymbols) return;
++    // CN qfq history is already local. Warming adjacent CN symbols competes
++    // with the next explicit chart click for the same NAS-backed read path.
++    // Keep adjacent prefetch for US, where it measurably improves navigation.
++    if (/\.(SS|SZ)$/i.test(currentSymbol)) return;
+ 
+     const nextSymbols = navigationSymbols.slice(currentIndex + 1, currentIndex + 3);
+     const prevSymbols = navigationSymbols.slice(Math.max(0, currentIndex - 2), currentIndex);
+diff --git a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+--- a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+@@ -111,4 +111,15 @@ describe('ChartViewerModal readiness lifecycle', () => {
+ 
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
+   });
++
++  it('does not warm adjacent CN charts after the current chart is ready', () => {
++    currentSymbol = '600000.SS';
++    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++
++    renderModal(queryClient);
++    fireEvent.click(screen.getByRole('button', { name: 'ready-600000.SS' }));
++
++    expect(prefetchPriceHistoryBatch).not.toHaveBeenCalled();
++    expect(prefetchFundamentalsBatch).not.toHaveBeenCalled();
++  });
+ });

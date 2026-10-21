@@ -1,0 +1,10 @@
+ARG BASE_IMAGE=personal/quant-center-web:0.3.0
+FROM ${BASE_IMAGE}
+
+# Deployment optimization: reuse the validated hardened Nginx runtime and
+# replace only the application assets and API proxy template.
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY dist/ /usr/share/nginx/html/
+
+LABEL org.opencontainers.image.version="0.4.0" \
+      io.sudox.quant.service="independent-nautilus-lab"

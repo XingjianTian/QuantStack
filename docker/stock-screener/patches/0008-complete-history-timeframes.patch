@@ -1,0 +1,115 @@
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index bce8145..aaf3b6f 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -13,6 +13,7 @@ import {
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+   pannedLogicalRange,
++  usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+
+@@ -87,9 +88,7 @@ function CandlestickChart({
+   const queryClient = useQueryClient();
+   const effectiveTimeframe = hideTimeframeToggle ? 'daily' : timeframe;
+   const historyPeriod = historyPeriodForTimeframe(effectiveTimeframe, period);
+-  const availableTimeframes = priceData
+-    ? CHART_TIMEFRAMES.filter(({ value }) => ['five-day', 'daily', 'weekly'].includes(value))
+-    : CHART_TIMEFRAMES;
++  const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData);
+
+   // Get any existing cached data for this symbol to use as placeholder
+   const getCachedData = () => {
+@@ -107,7 +106,7 @@ function CandlestickChart({
+   } = useQuery({
+     queryKey: priceHistoryKeys.symbol(symbol, historyPeriod),
+     queryFn: () => fetchPriceHistory(symbol, historyPeriod),
+-    enabled: !!symbol && !priceData,
++    enabled: !!symbol && !useBundledPriceData,
+     staleTime: PRICE_HISTORY_STALE_TIME,
+     keepPreviousData: true,
+     // Show stale/cached data immediately while fetching fresh data
+@@ -117,7 +116,7 @@ function CandlestickChart({
+     },
+   });
+
+-  const apiData = priceData ?? fetchedApiData;
++  const apiData = useBundledPriceData ? priceData : fetchedApiData;
+
+   // Live RS line + blue-dot dates (interactive surfaces only). Static charts
+   // carry the RS payload in their bundle instead, so the query stays disabled.
+@@ -143,11 +142,13 @@ function CandlestickChart({
+   // Whether the RS overlay can render at all here (drives the toggle's visibility).
+   const rsAvailable = !priceData || (Array.isArray(rsLineData) && rsLineData.length > 0);
+
+-  const effectiveDataUpdatedAt = dataUpdatedAtOverride ?? dataUpdatedAt;
+-  const effectiveIsLoading = Boolean(!priceData && isLoading);
+-  const effectiveIsFetching = Boolean(!priceData && isFetching);
+-  const effectiveError = priceData ? null : error;
+-  const effectiveRefetch = priceData ? () => Promise.resolve({ data: priceData }) : refetch;
++  const effectiveDataUpdatedAt = useBundledPriceData ? dataUpdatedAtOverride : dataUpdatedAt;
++  const effectiveIsLoading = Boolean(!useBundledPriceData && isLoading);
++  const effectiveIsFetching = Boolean(!useBundledPriceData && isFetching);
++  const effectiveError = useBundledPriceData ? null : error;
++  const effectiveRefetch = useBundledPriceData
++    ? () => Promise.resolve({ data: priceData })
++    : refetch;
+
+   // Format last updated time
+   const lastUpdatedText = useMemo(() => {
+@@ -671,7 +672,7 @@ function CandlestickChart({
+                 }}
+                 size="small"
+               >
+-                {availableTimeframes.map((candidate) => (
++                {CHART_TIMEFRAMES.map((candidate) => (
+                   <ToggleButton key={candidate.value} value={candidate.value}>
+                     {candidate.label}
+                   </ToggleButton>
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index aa19f1e..89de558 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -14,6 +14,12 @@ export const historyPeriodForTimeframe = (timeframe, fallback = '6mo') => (
+
+ export const isDailyTimeframe = (timeframe) => timeframe === 'daily';
+
++export const usesBundledPriceData = (timeframe, priceData) => (
++  Array.isArray(priceData)
++  && priceData.length > 0
++  && ['five-day', 'daily'].includes(timeframe)
++);
++
+ export const clearRsOverlayForTimeframe = (timeframe, series, markers) => {
+   if (isDailyTimeframe(timeframe)) return false;
+   series?.setData?.([]);
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index 3788417..ec32343 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -5,6 +5,7 @@ import {
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+   pannedLogicalRange,
++  usesBundledPriceData,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+
+@@ -24,6 +25,16 @@ describe('chart timeframe controls', () => {
+     expect(isDailyTimeframe('weekly')).toBe(false);
+   });
+
++  it('uses bundled data only for the fast five-day and daily views', () => {
++    const bundled = [{ date: '2026-08-31', close: 10 }];
++
++    expect(usesBundledPriceData('five-day', bundled)).toBe(true);
++    expect(usesBundledPriceData('daily', bundled)).toBe(true);
++    expect(usesBundledPriceData('weekly', bundled)).toBe(false);
++    expect(usesBundledPriceData('monthly', bundled)).toBe(false);
++    expect(usesBundledPriceData('daily', [])).toBe(false);
++  });
++
+   it('clears an existing RS overlay synchronously before a non-daily fit', () => {
+     const calls = [];
+     const series = { setData: (value) => calls.push(['series', value]) };

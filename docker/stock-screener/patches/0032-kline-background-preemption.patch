@@ -1,0 +1,402 @@
+diff --git a/src/api/groups.js b/src/api/groups.js
+index 7f7dcef..5ed1bbf 100644
+--- a/src/api/groups.js
++++ b/src/api/groups.js
+@@ -61,9 +61,10 @@ export const getRankMovers = async (period = '1w', limit = 20, market = 'US', as
+  * @param {number} days - Days of history to retrieve (default: 180)
+  * @returns {Promise<Object>} Group detail with history and rank changes
+  */
+-export const getGroupDetail = async (industryGroup, days = 180, market = 'US') => {
++export const getGroupDetail = async (industryGroup, days = 180, market = 'US', { signal } = {}) => {
+   const response = await apiClient.get('/v1/groups/rankings/detail', {
+-    params: { group: industryGroup, days, market }
++    params: { group: industryGroup, days, market },
++    signal,
+   });
+   return response.data;
+ };
+diff --git a/src/api/priceHistory.js b/src/api/priceHistory.js
+index a9325f6..d539dff 100644
+--- a/src/api/priceHistory.js
++++ b/src/api/priceHistory.js
+@@ -46,8 +46,8 @@ export const fetchRSLine = async (symbol, period = '6mo', { signal } = {}) => {
+  * @param {string} period - Time period (default: '6mo')
+  * @returns {Promise<{data: Record<string, Array>, missing: string[]}>}
+  */
+-export const fetchPriceHistoryBatch = async (symbols, period = '6mo') => {
+-  const response = await apiClient.post('/v1/stocks/history/batch', { symbols, period });
++export const fetchPriceHistoryBatch = async (symbols, period = '6mo', { signal } = {}) => {
++  const response = await apiClient.post('/v1/stocks/history/batch', { symbols, period }, { signal });
+   return response.data;
+ };
+ 
+@@ -85,7 +85,7 @@ export const prefetchPriceHistoryBatch = async (
+   queryClient,
+   symbols,
+   period = '6mo',
+-  { staleTime = PRICE_HISTORY_STALE_TIME } = {},
++  { staleTime = PRICE_HISTORY_STALE_TIME, signal } = {},
+ ) => {
+   if (!queryClient || !Array.isArray(symbols) || symbols.length === 0) {
+     return { data: {}, missing: [] };
+@@ -115,7 +115,7 @@ export const prefetchPriceHistoryBatch = async (
+   }
+ 
+   try {
+-    const batch = await fetchPriceHistoryBatch(toFetch, period);
++    const batch = await fetchPriceHistoryBatch(toFetch, period, { signal });
+     const data = batch?.data || {};
+     Object.entries(data).forEach(([sym, points]) => {
+       queryClient.setQueryData(priceHistoryKeys.symbol(sym, period), points);
+diff --git a/src/api/scans.js b/src/api/scans.js
+index 5bec053..9fe8a52 100644
+--- a/src/api/scans.js
++++ b/src/api/scans.js
+@@ -89,12 +89,13 @@ export const cancelScan = async (scanId) => {
+  * @param {Object} params - Query parameters (supports all filter types)
+  * @returns {Promise<Object>} Paginated scan results
+  */
+-export const getScanResults = async (scanId, params = {}) => {
++export const getScanResults = async (scanId, params = {}, { signal } = {}) => {
+   const response = await apiClient.get(`/v1/scans/${scanId}/results`, {
+     params: {
+       detail_level: 'table',
+       ...params,
+     },
++    signal,
+   });
+   return response.data;
+ };
+@@ -105,9 +106,10 @@ export const getScanResults = async (scanId, params = {}) => {
+  * @param {Object} params - Query parameters (filters/sort/passes_only)
+  * @returns {Promise<Object>} Symbol list response with total + symbols
+  */
+-export const getScanSymbols = async (scanId, params = {}) => {
++export const getScanSymbols = async (scanId, params = {}, { signal } = {}) => {
+   const response = await apiClient.get(`/v1/scans/${scanId}/symbols`, {
+     params,
++    signal,
+   });
+   return response.data;
+ };
+@@ -180,7 +182,7 @@ export const exportScanResults = async (scanId, params = {}) => {
+  * @param {string} symbol - Stock symbol
+  * @returns {Promise<Object>} Single scan result item
+  */
+-export const getSingleResult = async (scanId, symbol, params = {}) => {
++export const getSingleResult = async (scanId, symbol, params = {}, { signal } = {}) => {
+   const response = await apiClient.get(
+     `/v1/scans/${scanId}/result/${symbol}`,
+     {
+@@ -188,6 +190,7 @@ export const getSingleResult = async (scanId, symbol, params = {}) => {
+         detail_level: 'core',
+         ...params,
+       },
++      signal,
+     }
+   );
+   return response.data;
+@@ -211,13 +214,14 @@ export const getSetupDetails = async (scanId, symbol) => {
+  * @param {Object} params - API filter parameters (from buildFilterParams utility)
+  * @returns {Promise<Array<string>>} Complete list of symbols matching filters
+  */
+-export const getAllFilteredSymbols = async (scanId, params = {}) => {
++export const getAllFilteredSymbols = async (scanId, params = {}, { signal } = {}) => {
+   try {
+-    const response = await getScanSymbols(scanId, params);
++    const response = await getScanSymbols(scanId, params, { signal });
+     if (Array.isArray(response?.symbols)) {
+       return response.symbols;
+     }
+-  } catch {
++  } catch (error) {
++    if (signal?.aborted) throw error;
+     // Fallback to paginated /results crawl for backward compatibility.
+   }
+ 
+@@ -227,7 +231,7 @@ export const getAllFilteredSymbols = async (scanId, params = {}) => {
+     page: 1,
+     per_page: 100,
+     include_sparklines: false,
+-  });
++  }, { signal });
+ 
+   const total = firstPage.total;
+   const symbols = firstPage.results.map((r) => r.symbol);
+@@ -243,7 +247,7 @@ export const getAllFilteredSymbols = async (scanId, params = {}) => {
+           page,
+           per_page: 100,
+           include_sparklines: false,
+-        }));
++        }, { signal }));
+     }
+ 
+     // Fetch in batches of 3 to avoid overwhelming the server
+diff --git a/src/api/stocks.js b/src/api/stocks.js
+index 833b06e..b7a54cb 100644
+--- a/src/api/stocks.js
++++ b/src/api/stocks.js
+@@ -21,7 +21,7 @@ export const getStockInfo = async (symbol) => {
+  * @param {import('@tanstack/react-query').QueryClient} queryClient
+  * @param {Array<string>} symbols - Symbols to warm
+  */
+-export const prefetchFundamentalsBatch = async (queryClient, symbols) => {
++export const prefetchFundamentalsBatch = async (queryClient, symbols, { signal } = {}) => {
+   const missing = (symbols || []).filter(
+     (sym) => sym && queryClient.getQueryData(['fundamentals', sym]) === undefined
+   );
+@@ -29,7 +29,7 @@ export const prefetchFundamentalsBatch = async (queryClient, symbols) => {
+   try {
+     const response = await apiClient.post('/v1/stocks/fundamentals/batch', {
+       symbols: missing,
+-    });
++    }, { signal });
+     Object.entries(response.data?.data ?? {}).forEach(([sym, fundamentals]) => {
+       if (fundamentals) {
+         queryClient.setQueryData(['fundamentals', sym], fundamentals);
+@@ -50,10 +50,12 @@ export const prefetchFundamentalsBatch = async (queryClient, symbols) => {
+ export const getStockFundamentals = async (
+   symbol,
+   forceRefresh = false,
+-  useAlphaVantage = false
++  useAlphaVantage = false,
++  { signal } = {},
+ ) => {
+   const response = await apiClient.get(`/v1/stocks/${symbol}/fundamentals`, {
+     params: { force_refresh: forceRefresh, use_alpha_vantage: useAlphaVantage },
++    signal,
+   });
+   return response.data;
+ };
+diff --git a/src/components/Charts/CandlestickChart.jsx b/src/components/Charts/CandlestickChart.jsx
+index 5886cda..7743219 100644
+--- a/src/components/Charts/CandlestickChart.jsx
++++ b/src/components/Charts/CandlestickChart.jsx
+@@ -52,6 +52,7 @@ const BACKGROUND_IDLE_DELAY_MS = 1500;
+  * @param {Function} props.onVisibleRangeChange - Callback when visible range changes
+  * @param {Function} props.onDataReady - Callback after the current symbol has price data
+  * @param {Function} props.onHistoryReady - Callback after shared predecessor history settles
++ * @param {Function} props.onForegroundHistoryStart - Callback before an older-history page starts
+  * @param {Array|null} props.priceData - Optional static OHLCV payload to render without API calls
+  * @param {number|null} props.dataUpdatedAtOverride - Optional timestamp (ms) for static bundles
+  * @param {boolean} props.compact - When true, hides overlays (timeframe toggle, OHLC legend, updated-at indicator) for dense grid layouts
+@@ -66,6 +67,7 @@ function CandlestickChart({
+   onVisibleRangeChange = null,
+   onDataReady = null,
+   onHistoryReady = null,
++  onForegroundHistoryStart = null,
+   priceData = null,
+   rsLineData = null,
+   blueDots = null,
+@@ -400,6 +402,7 @@ function CandlestickChart({
+     setBackgroundReady(false);
+     setHistoryState('loading');
+     try {
++      await onForegroundHistoryStart?.(symbol);
+       await queryClient.cancelQueries({
+         queryKey: priceHistoryKeys.rsLine(symbol, historyPeriod),
+         exact: true,
+@@ -433,7 +436,7 @@ function CandlestickChart({
+     } finally {
+       historyRequestPendingRef.current = false;
+     }
+-  }, [apiData, historyPeriod, queryClient, symbol, usesSharedInteractiveHistory]);
++  }, [apiData, historyPeriod, onForegroundHistoryStart, queryClient, symbol, usesSharedInteractiveHistory]);
+ 
+   // Match the main-market chart's datafeed semantics: let Lightweight Charts
+   // own pan/drag momentum, then prefetch one older local page before the user
+diff --git a/src/components/Charts/CandlestickChart.streaming.test.jsx b/src/components/Charts/CandlestickChart.streaming.test.jsx
+index 90f58a7..c6eee1f 100644
+--- a/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -198,6 +198,23 @@ describe('CandlestickChart streaming history', () => {
+     expect(rsSignal.aborted).toBe(true);
+   });
+ 
++  it('revokes modal background work before starting the predecessor request', async () => {
++    let releaseForeground;
++    const onForegroundHistoryStart = vi.fn(() => new Promise((resolve) => {
++      releaseForeground = resolve;
++    }));
++    renderChart({ onForegroundHistoryStart });
++
++    await screen.findByText('12.00');
++    fireEvent.wheel(screen.getByTestId('candlestick-chart-canvas'), { deltaX: 40, deltaY: 0 });
++    chartHarness.logicalRangeHandler({ from: -20, to: 40 });
++
++    await waitFor(() => expect(onForegroundHistoryStart).toHaveBeenCalledWith('600000.SS'));
++    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++    releaseForeground();
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++  });
++
+   it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
+     let resolveRange;
+     chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+diff --git a/src/components/Scan/ChartViewerModal.jsx b/src/components/Scan/ChartViewerModal.jsx
+index 0f9f73a..d917f13 100644
+--- a/src/components/Scan/ChartViewerModal.jsx
++++ b/src/components/Scan/ChartViewerModal.jsx
+@@ -69,8 +69,21 @@ function ChartViewerModal({
+   const [setupDrawerOpen, setSetupDrawerOpen] = useState(false);
+   const [visibleRange, setVisibleRange] = useState(null); // Persist zoom across symbol navigation
+   const [historyReadySymbol, setHistoryReadySymbol] = useState(null);
++  const backgroundBatchAbortRef = useRef(null);
+   const handleChartHistoryReady = useCallback((symbol) => setHistoryReadySymbol(symbol), []);
+ 
++  const handleForegroundHistoryStart = useCallback(async (symbol) => {
++    setHistoryReadySymbol((readySymbol) => (readySymbol === symbol ? null : readySymbol));
++    backgroundBatchAbortRef.current?.abort();
++    backgroundBatchAbortRef.current = null;
++    await Promise.all([
++      queryClient.cancelQueries({ queryKey: ['allFilteredSymbols'] }),
++      queryClient.cancelQueries({ queryKey: ['stockResult', scanId] }),
++      queryClient.cancelQueries({ queryKey: ['fundamentals'] }),
++      queryClient.cancelQueries({ queryKey: ['groupRank'] }),
++    ]);
++  }, [queryClient, scanId]);
++
+   // Build API params from filter state
+   const filterParams = useMemo(
+     () => buildFilterParams(filters, { sortBy, sortOrder }),
+@@ -94,7 +107,7 @@ function ChartViewerModal({
+   // Fetch all filtered symbols for navigation (sort-aware)
+   const { data: allSymbols, isLoading: symbolsLoading } = useQuery({
+     queryKey: ['allFilteredSymbols', scanId, filterCacheKey, sortBy, sortOrder],
+-    queryFn: () => getAllFilteredSymbols(scanId, filterParams),
++    queryFn: ({ signal }) => getAllFilteredSymbols(scanId, filterParams, { signal }),
+     enabled: open && !!scanId && !!historyReadySymbol && !Array.isArray(navigationSymbolsOverride),
+     staleTime: 5000, // 5 seconds — short enough to catch mid-session sort changes
+     refetchOnMount: 'always', // Always refetch when modal opens to pick up sort changes
+@@ -158,7 +171,7 @@ function ChartViewerModal({
+   // Fetch stock result if not in current page (using optimized single-stock endpoint)
+   const { data: fetchedStockData } = useQuery({
+     queryKey: ['stockResult', scanId, currentSymbol],
+-    queryFn: () => getSingleResult(scanId, currentSymbol),
++    queryFn: ({ signal }) => getSingleResult(scanId, currentSymbol, {}, { signal }),
+     enabled: open && !!scanId && historyReadySymbol === currentSymbol && !stockData,
+     staleTime: 300000, // 5 minutes
+   });
+@@ -198,7 +211,7 @@ function ChartViewerModal({
+   // Fetch fundamentals for current symbol
+   const { data: fundamentals } = useQuery({
+     queryKey: ['fundamentals', currentSymbol],
+-    queryFn: () => getStockFundamentals(currentSymbol),
++    queryFn: ({ signal }) => getStockFundamentals(currentSymbol, false, false, { signal }),
+     enabled: open && historyReadySymbol === currentSymbol,
+     staleTime: 300000, // 5 minutes (data is cached 7 days server-side)
+   });
+@@ -213,7 +226,7 @@ function ChartViewerModal({
+     isLoading: isGroupRankLoading,
+   } = useQuery({
+     queryKey: ['groupRank', groupMarket, industryGroup],
+-    queryFn: () => getGroupDetail(industryGroup, 1, groupMarket),
++    queryFn: ({ signal }) => getGroupDetail(industryGroup, 1, groupMarket, { signal }),
+     enabled: open && historyReadySymbol === currentSymbol && !!industryGroup,
+     staleTime: 300000, // 5 minutes
+     retry: false,
+@@ -285,14 +298,17 @@ function ChartViewerModal({
+     const adjacent = [...nextSymbols, ...prevSymbols].filter(Boolean);
+     if (adjacent.length === 0) return;
+ 
+-    prefetchPriceHistoryBatch(queryClient, adjacent, '6mo');
+-    prefetchFundamentalsBatch(queryClient, adjacent);
++    const controller = new AbortController();
++    backgroundBatchAbortRef.current?.abort();
++    backgroundBatchAbortRef.current = controller;
++    prefetchPriceHistoryBatch(queryClient, adjacent, '6mo', { signal: controller.signal });
++    prefetchFundamentalsBatch(queryClient, adjacent, { signal: controller.signal });
+ 
+     if (scanId) {
+       adjacent.forEach((symbol) => {
+         queryClient.prefetchQuery({
+           queryKey: ['stockResult', scanId, symbol],
+-          queryFn: () => getSingleResult(scanId, symbol),
++          queryFn: ({ signal }) => getSingleResult(scanId, symbol, {}, { signal }),
+           staleTime: 300000,
+         });
+       });
+@@ -314,11 +330,17 @@ function ChartViewerModal({
+     adjacentGroups.forEach(({ market, group }) => {
+       queryClient.prefetchQuery({
+         queryKey: ['groupRank', market, group],
+-        queryFn: () => getGroupDetail(group, 1, market),
++        queryFn: ({ signal }) => getGroupDetail(group, 1, market, { signal }),
+         staleTime: 300000,
+         retry: false,
+       });
+     });
++    return () => {
++      controller.abort();
++      if (backgroundBatchAbortRef.current === controller) {
++        backgroundBatchAbortRef.current = null;
++      }
++    };
+   }, [open, currentSymbol, historyReadySymbol, currentIndex, navigationSymbols, queryClient, scanId, currentPageResults]);
+ 
+   return (
+@@ -567,6 +589,7 @@ function ChartViewerModal({
+                     visibleRange={visibleRange}
+                     onVisibleRangeChange={setVisibleRange}
+                     onHistoryReady={handleChartHistoryReady}
++                    onForegroundHistoryStart={handleForegroundHistoryStart}
+                   />
+                 ) : (
+                   <Box
+diff --git a/src/components/Scan/ChartViewerModal.readiness.test.jsx b/src/components/Scan/ChartViewerModal.readiness.test.jsx
+index c797680..7e61204 100644
+--- a/src/components/Scan/ChartViewerModal.readiness.test.jsx
++++ b/src/components/Scan/ChartViewerModal.readiness.test.jsx
+@@ -22,7 +22,12 @@ vi.mock('../../hooks/useChartNavigation', () => ({
+ }));
+ 
+ vi.mock('../Charts/CandlestickChart', () => {
+-  const MockCandlestickChart = ({ symbol, onDataReady, onHistoryReady }) => {
++  const MockCandlestickChart = ({
++    symbol,
++    onDataReady,
++    onHistoryReady,
++    onForegroundHistoryStart,
++  }) => {
+     const [mountedFor] = useState(symbol);
+     return (
+       <>
+@@ -34,6 +39,13 @@ vi.mock('../Charts/CandlestickChart', () => {
+         >
+           paint-ready-{symbol}
+         </button>
++        <button
++          type="button"
++          aria-label={`foreground-history-${symbol}`}
++          onClick={() => onForegroundHistoryStart?.(symbol)}
++        >
++          foreground-history-{symbol}
++        </button>
+         <button
+           type="button"
+           aria-label={`history-ready-${symbol}`}
+@@ -209,4 +221,23 @@ describe('ChartViewerModal readiness lifecycle', () => {
+     fireEvent.click(screen.getByRole('button', { name: 'history-ready-AAA' }));
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
+   });
++
++  it('revokes and cancels latched background work before a later predecessor page', async () => {
++    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++    const cancelQueries = vi.spyOn(queryClient, 'cancelQueries');
++
++    renderModal(queryClient);
++    fireEvent.click(screen.getByRole('button', { name: 'history-ready-AAA' }));
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++    const batchSignal = prefetchPriceHistoryBatch.mock.calls[0][3].signal;
++    expect(batchSignal.aborted).toBe(false);
++
++    fireEvent.click(screen.getByRole('button', { name: 'foreground-history-AAA' }));
++
++    expect(batchSignal.aborted).toBe(true);
++    expect(cancelQueries).toHaveBeenCalledWith({ queryKey: ['allFilteredSymbols'] });
++    expect(cancelQueries).toHaveBeenCalledWith({ queryKey: ['stockResult', 'scan-1'] });
++    expect(cancelQueries).toHaveBeenCalledWith({ queryKey: ['fundamentals'] });
++    expect(cancelQueries).toHaveBeenCalledWith({ queryKey: ['groupRank'] });
++  });
+ });
+

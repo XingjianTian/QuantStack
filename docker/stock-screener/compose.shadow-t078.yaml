@@ -1,0 +1,170 @@
+name: quant-workspace-shadow-t078
+
+services:
+  postgres:
+    image: ${T078_POSTGRES_IMAGE:?set the inspected immutable PostgreSQL image}
+    pull_policy: never
+    environment:
+      POSTGRES_DB: ${T078_POSTGRES_DB:?set isolated database name}
+      POSTGRES_USER: ${T078_POSTGRES_USER:?set isolated database user}
+      POSTGRES_PASSWORD: ${T078_POSTGRES_PASSWORD:?set isolated database password}
+    volumes:
+      - ${T078_POSTGRES_ROOT:?set new isolated PostgreSQL root}:/var/lib/postgresql/data
+    group_add:
+      - ${T078_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    networks: [core]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    restart: "no"
+
+  redis:
+    image: ${T078_REDIS_IMAGE:?set the inspected immutable Redis image}
+    pull_policy: never
+    command: redis-server --appendonly yes
+    volumes:
+      - ${T078_REDIS_ROOT:?set new isolated Redis root}:/data
+    group_add:
+      - ${T078_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    networks: [core]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --raw INFO persistence | tr -d '\\r' | grep -q '^loading:0$'"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    restart: "no"
+
+  batch-api:
+    image: ${T078_QUANTSTACK_IMAGE:?set the inspected immutable QuantStack image}
+    pull_policy: never
+    environment:
+      QUANT_DATA_ROOT: /quant-data
+      QUANT_EXPERIMENT_ROOT: /tmp/experiments
+      QUANT_API_HOST: 0.0.0.0
+      QUANT_API_PORT: "8900"
+      QUANT_API_KEY: ${T078_QUANT_API_KEY:?set ephemeral Batch API key}
+      QUANT_BATCH_CONSUMER_ACCESS: shadow
+    volumes:
+      - ${T078_QUANT_DATA_ROOT:?set new isolated QuantStack root}:/quant-data:ro
+    group_add:
+      - ${T078_QUANT_DATA_READ_GID:?set the stable quant-data-read GID}
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [core]
+    ports:
+      - 127.0.0.1:28920:8900
+    mem_limit: 2g
+    cpus: 1.5
+    pids_limit: 256
+    restart: "no"
+
+  egress-proxy:
+    image: ${T078_BACKEND_IMAGE:?set the pinned Stock Screener backend image}
+    pull_policy: never
+    command: python /opt/t078/yahoo_allow_proxy.py
+    environment:
+      T078_PROXY_BIND: 0.0.0.0
+      T078_PROXY_PORT: "3128"
+      T078_PROXY_ALLOWED_HOSTS: query1.finance.yahoo.com,query2.finance.yahoo.com,fc.yahoo.com
+      T078_PROXY_MAX_CONNECTIONS: "100"
+      T078_PROXY_MIN_INTERVAL_SECONDS: "1"
+      T078_PROXY_LEDGER: /evidence/proxy/external-fetch-ledger.jsonl
+    volumes:
+      - ./yahoo_allow_proxy.py:/opt/t078/yahoo_allow_proxy.py:ro
+      - ${T078_EVIDENCE_ROOT:?set new isolated evidence root}/proxy:/evidence/proxy
+    group_add:
+      - ${T078_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [core, egress]
+    mem_limit: 96m
+    cpus: 0.2
+    pids_limit: 64
+    restart: "no"
+
+  backend:
+    image: ${T078_BACKEND_IMAGE:?set the pinned Stock Screener backend image}
+    pull_policy: never
+    command: uvicorn quant_workspace_compat:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: postgresql://${T078_POSTGRES_USER}:${T078_POSTGRES_PASSWORD}@postgres:5432/${T078_POSTGRES_DB}
+      POSTGRES_DB: ${T078_POSTGRES_DB}
+      POSTGRES_USER: ${T078_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${T078_POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENABLED_MARKETS: CN
+      MARKET_DATA_SOURCE_MODE: github_first
+      WEB_CONCURRENCY: "1"
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "1"
+      SERVER_AUTH_ENABLED: "false"
+      SERVER_EXPOSE_API_DOCS: "false"
+      FEATURE_CHATBOT: "false"
+      FEATURE_THEMES: "false"
+      LLM_FALLBACK_ENABLED: "false"
+      HTTP_PROXY: http://egress-proxy:3128
+      HTTPS_PROXY: http://egress-proxy:3128
+      NO_PROXY: postgres,redis,batch-api,backend,127.0.0.1,localhost
+      SS_QUANTSTACK_READ_MODE: shadow
+      SS_QUANTSTACK_SHADOW_ENABLED: "true"
+      SS_QUANTSTACK_SHADOW_SAMPLE_RATE: "1"
+      SS_QUANTSTACK_SHADOW_ALLOWLIST: ${T078_SHADOW_ALLOWLIST:?set frozen corpus allowlist}
+      SS_QUANTSTACK_BASE_URL: http://batch-api:8900
+      SS_QUANTSTACK_API_KEY: ${T078_QUANT_API_KEY}
+      SS_QUANTSTACK_BARS_DATASET_ID: cn_equity_daily
+      SS_QUANTSTACK_DATASET_VERSION: 2015-2026.full-market-v1.ss-shadow-v1
+      SS_QUANTSTACK_TIMEOUT_SECONDS: "5"
+      SS_QUANTSTACK_MAX_ATTEMPTS: "2"
+      SS_QUANTSTACK_SHADOW_MAX_WINDOW_DAYS: "3650"
+      SS_QUANTSTACK_CACHE_MAX_ENTRIES: "256"
+      SS_QUANTSTACK_SHADOW_QUEUE_SIZE: "32"
+      SS_QUANTSTACK_SHADOW_MAX_SYMBOLS_PER_TASK: "50"
+      SS_QUANTSTACK_SHADOW_MAX_LEGACY_ROWS_PER_TASK: "100000"
+      SS_QUANTSTACK_SHUTDOWN_TIMEOUT_SECONDS: "5"
+      SS_QUANTSTACK_SHADOW_REPORT_ROOT: /evidence/driver/shadow-reports
+      SS_RUNTIME_ENV: isolated-shadow
+      SS_QUANTSTACK_ALLOW_CANDIDATE: "false"
+      T078_CONTROL_TOKEN: ${T078_CONTROL_TOKEN:?set ephemeral isolated control token}
+    volumes:
+      - ${T078_SS_DATA_ROOT:?set new isolated SS data root}:/app/data
+      - ${T078_EVIDENCE_ROOT}/driver:/evidence/driver
+      - ./quant_workspace_compat.py:/app/quant_workspace_compat.py:ro
+      - ./quantstack_consumer_adapter.py:/app/quantstack_consumer_adapter.py:ro
+      - ./shadow_soak_driver.py:/opt/t078/shadow_soak_driver.py:ro
+    group_add:
+      - ${T078_SHADOW_WRITE_GID:?set the stable quant-shadow-write GID}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      batch-api: {condition: service_healthy}
+      egress-proxy: {condition: service_started}
+    networks: [core]
+    ports:
+      - 127.0.0.1:28910:8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 120s
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+    restart: "no"
+
+networks:
+  core:
+    internal: true
+  egress: {}

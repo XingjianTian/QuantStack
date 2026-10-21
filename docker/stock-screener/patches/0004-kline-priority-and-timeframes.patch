@@ -1,0 +1,788 @@
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index 6fe0403c..999d470e 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -6,6 +6,14 @@ import { fetchPriceHistory, fetchRSLine, priceHistoryKeys, PRICE_HISTORY_STALE_T
+ import { rsBandForRange } from './rsBand';
+ import ChartSkeleton from './ChartSkeleton';
+ import { transformToCandlestickData } from './candlestickData';
++import {
++  CHART_TIMEFRAMES,
++  chartZoomDirection,
++  clearRsOverlayForTimeframe,
++  historyPeriodForTimeframe,
++  isDailyTimeframe,
++  zoomedLogicalRange,
++} from './chartTimeframes';
+
+ // Debounce utility
+ const debounce = (fn, ms) => {
+@@ -29,10 +36,11 @@ const debounce = (fn, ms) => {
+  * @param {number} props.height - Chart height in pixels
+  * @param {Object} props.visibleRange - Optional visible time range to restore { from: timestamp, to: timestamp }
+  * @param {Function} props.onVisibleRangeChange - Callback when visible range changes
++ * @param {Function} props.onDataReady - Callback after the current symbol has price data
+  * @param {Array|null} props.priceData - Optional static OHLCV payload to render without API calls
+  * @param {number|null} props.dataUpdatedAtOverride - Optional timestamp (ms) for static bundles
+- * @param {boolean} props.compact - When true, hides overlays (Daily/Weekly toggle, OHLC legend, updated-at indicator) for dense grid layouts
+- * @param {boolean} props.hideTimeframeToggle - When true, hides the Daily/Weekly and RS toggle cluster (other overlays stay) and forces the daily timeframe
++ * @param {boolean} props.compact - When true, hides overlays (timeframe toggle, OHLC legend, updated-at indicator) for dense grid layouts
++ * @param {boolean} props.hideTimeframeToggle - When true, hides timeframe and RS controls (other overlays stay) and forces the daily timeframe
+  * @param {boolean} props.interactive - When false, disables time-axis pan/zoom (mouse wheel, drag, pinch) until re-enabled
+  */
+ function CandlestickChart({
+@@ -41,6 +49,7 @@ function CandlestickChart({
+   height = 600,
+   visibleRange = null,
+   onVisibleRangeChange = null,
++  onDataReady = null,
+   priceData = null,
+   rsLineData = null,
+   blueDots = null,
+@@ -63,6 +72,8 @@ function CandlestickChart({
+   const isFirstDataLoadRef = useRef(true); // Track first data load
+   const prevCloseMapRef = useRef(new Map()); // Map of date -> previous close for % change calculation
+   const latestCandleRef = useRef(null); // Store latest candle for default display
++  const previousTimeframeRef = useRef('daily');
++  const fitTimeframeWhenSettledRef = useRef(false);
+
+   const [timeframe, setTimeframe] = useState('daily');
+   const [showRSLine, setShowRSLine] = useState(true); // RS line overlay toggle
+@@ -72,10 +83,15 @@ function CandlestickChart({
+   const isDarkMode = theme.palette.mode === 'dark';
+
+   const queryClient = useQueryClient();
++  const effectiveTimeframe = hideTimeframeToggle ? 'daily' : timeframe;
++  const historyPeriod = historyPeriodForTimeframe(effectiveTimeframe, period);
++  const availableTimeframes = priceData
++    ? CHART_TIMEFRAMES.filter(({ value }) => ['five-day', 'daily', 'weekly'].includes(value))
++    : CHART_TIMEFRAMES;
+
+   // Get any existing cached data for this symbol to use as placeholder
+   const getCachedData = () => {
+-    return queryClient.getQueryData(priceHistoryKeys.symbol(symbol, period));
++    return queryClient.getQueryData(priceHistoryKeys.symbol(symbol, historyPeriod));
+   };
+
+   // Fetch price history data (uses shared query keys for cache consistency)
+@@ -87,21 +103,27 @@ function CandlestickChart({
+     refetch,
+     dataUpdatedAt,
+   } = useQuery({
+-    queryKey: priceHistoryKeys.symbol(symbol, period),
+-    queryFn: () => fetchPriceHistory(symbol, period),
++    queryKey: priceHistoryKeys.symbol(symbol, historyPeriod),
++    queryFn: () => fetchPriceHistory(symbol, historyPeriod),
+     enabled: !!symbol && !priceData,
+     staleTime: PRICE_HISTORY_STALE_TIME,
+     keepPreviousData: true,
+     // Show stale/cached data immediately while fetching fresh data
+-    placeholderData: getCachedData,
++    placeholderData: (previousData, previousQuery) => {
++      const previousSymbol = previousQuery?.queryKey?.[1];
++      return previousSymbol === symbol ? (previousData ?? getCachedData()) : getCachedData();
++    },
+   });
+
++  const apiData = priceData ?? fetchedApiData;
++
+   // Live RS line + blue-dot dates (interactive surfaces only). Static charts
+   // carry the RS payload in their bundle instead, so the query stays disabled.
+   const { data: fetchedRsData } = useQuery({
+-    queryKey: priceHistoryKeys.rsLine(symbol, period),
+-    queryFn: () => fetchRSLine(symbol, period),
+-    enabled: !!symbol && !priceData && !compact && showRSLine,
++    queryKey: priceHistoryKeys.rsLine(symbol, historyPeriod),
++    queryFn: () => fetchRSLine(symbol, historyPeriod),
++    enabled: !!symbol && !priceData && !compact && showRSLine && !isFetching
++      && Array.isArray(apiData) && apiData.length > 0,
+     staleTime: PRICE_HISTORY_STALE_TIME,
+     keepPreviousData: true,
+   });
+@@ -119,7 +141,6 @@ function CandlestickChart({
+   // Whether the RS overlay can render at all here (drives the toggle's visibility).
+   const rsAvailable = !priceData || (Array.isArray(rsLineData) && rsLineData.length > 0);
+
+-  const apiData = priceData ?? fetchedApiData;
+   const effectiveDataUpdatedAt = dataUpdatedAtOverride ?? dataUpdatedAt;
+   const effectiveIsLoading = Boolean(!priceData && isLoading);
+   const effectiveIsFetching = Boolean(!priceData && isFetching);
+@@ -141,17 +162,13 @@ function CandlestickChart({
+     return new Date(effectiveDataUpdatedAt).toLocaleDateString();
+   }, [effectiveDataUpdatedAt]);
+
+-  // When the timeframe toggle is hidden, force daily so the chart can't
+-  // remain on a stale weekly aggregation chosen before the toggle disappeared.
+-  const effectiveTimeframe = hideTimeframeToggle ? 'daily' : timeframe;
+-
+   // Single source of truth for "is the RS line actually drawn right now". The
+   // RS series is daily-only and toggleable, so it's hidden on weekly or when
+   // toggled off. This drives BOTH the reserved-strip layout (price/volume
+   // reclaim the strip's space when RS is hidden) and the "RS" label.
+   const rsStripShown =
+     showRSLine &&
+-    effectiveTimeframe === 'daily' &&
++    isDailyTimeframe(effectiveTimeframe) &&
+     Array.isArray(rsData?.rs_line) &&
+     rsData.rs_line.length > 0;
+
+@@ -161,6 +178,12 @@ function CandlestickChart({
+     return transformToCandlestickData(apiData, effectiveTimeframe);
+   }, [apiData, effectiveTimeframe]);
+
++  useEffect(() => {
++    if (Array.isArray(apiData) && apiData.length > 0 && onDataReady) {
++      onDataReady(symbol);
++    }
++  }, [apiData, onDataReady, symbol]);
++
+   // Initialize chart on mount using useLayoutEffect for synchronous DOM access
+   useLayoutEffect(() => {
+     if (!chartContainerRef.current) {
+@@ -290,24 +313,58 @@ function CandlestickChart({
+     }, 100);
+
+     const timeScale = chartRef.current.timeScale();
+-    const unsubscribe = timeScale.subscribeVisibleTimeRangeChange((range) => {
++    const handleRangeChange = (range) => {
+       if (range) {
+         debouncedRangeChange(range);
+       }
+-    });
++    };
++    timeScale.subscribeVisibleTimeRangeChange(handleRangeChange);
+
+     return () => {
+       debouncedRangeChange.cancel();
+-      if (unsubscribe) unsubscribe();
++      timeScale.unsubscribeVisibleTimeRangeChange(handleRangeChange);
+     };
+   }, [onVisibleRangeChange, symbol]);
+
++  // Cmd/Ctrl +/- changes the visible bar count. Mouse wheel, drag and pinch
++  // continue to use Lightweight Charts' native interaction handlers.
++  useEffect(() => {
++    if (compact || !interactive) return undefined;
++
++    const handleKeyDown = (event) => {
++      const direction = chartZoomDirection(event);
++      if (!direction || !chartRef.current) return;
++      const activeElement = document.activeElement;
++      if (activeElement?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
++
++      const timeScale = chartRef.current.timeScale();
++      const nextRange = zoomedLogicalRange(
++        timeScale.getVisibleLogicalRange(),
++        direction,
++        chartData?.candlesticks?.length ?? 0,
++      );
++      if (!nextRange) return;
++      event.preventDefault();
++      timeScale.setVisibleLogicalRange(nextRange);
++    };
++
++    window.addEventListener('keydown', handleKeyDown);
++    return () => window.removeEventListener('keydown', handleKeyDown);
++  }, [chartData?.candlesticks?.length, compact, interactive]);
++
+   // Update chart data when data changes
+   useEffect(() => {
+     if (!chartData || !chartRef.current) {
+       return;
+     }
+
++    const rangeBeforeUpdate = !isFirstDataLoadRef.current && !shouldRestoreRangeRef.current
++      ? chartRef.current.timeScale().getVisibleRange()
++      : null;
++    const timeframeChanged = previousTimeframeRef.current !== effectiveTimeframe;
++    previousTimeframeRef.current = effectiveTimeframe;
++    if (timeframeChanged) fitTimeframeWhenSettledRef.current = true;
++
+     // Update volume data
+     if (volumeSeriesRef.current && chartData.volume.length > 0) {
+       volumeSeriesRef.current.setData(chartData.volume);
+@@ -374,17 +431,28 @@ function CandlestickChart({
+         // No saved range - fit content
+         chartRef.current.timeScale().fitContent();
+       }
+-    } else if (isFirstDataLoadRef.current) {
+-      // First load - fit content
++    } else if (
++      isFirstDataLoadRef.current
++      || (fitTimeframeWhenSettledRef.current && !effectiveIsFetching)
++    ) {
++      // Fit the first response and the completed response for a newly selected timeframe.
+       isFirstDataLoadRef.current = false;
++      fitTimeframeWhenSettledRef.current = false;
+       chartRef.current.timeScale().fitContent();
++    } else if (rangeBeforeUpdate) {
++      // A refreshed response for the same timeframe preserves the user's viewport.
++      setTimeout(() => {
++        if (chartRef.current) {
++          chartRef.current.timeScale().setVisibleRange(rangeBeforeUpdate);
++        }
++      }, 0);
+     }
+     // Otherwise, don't touch the zoom - let user adjust freely
+-  }, [chartData, visibleRange]);
++  }, [chartData, effectiveIsFetching, effectiveTimeframe, visibleRange]);
+
+   // Update the RS line overlay + blue-dot markers.
+-  // Only rendered on the daily timeframe (the RS series is daily); cleared
+-  // otherwise so stale points never linger under weekly candles.
++  // Only rendered on the full daily view; the five-day preset intentionally
++  // keeps exactly five candles and must not be expanded by a longer RS series.
+   useEffect(() => {
+     const series = rsLineSeriesRef.current;
+     const markers = rsMarkersRef.current;
+@@ -557,13 +625,22 @@ function CandlestickChart({
+                 exclusive
+                 onChange={(e, newTimeframe) => {
+                   if (newTimeframe !== null) {
++                    clearRsOverlayForTimeframe(
++                      newTimeframe,
++                      rsLineSeriesRef.current,
++                      rsMarkersRef.current,
++                    );
++                    fitTimeframeWhenSettledRef.current = true;
+                     setTimeframe(newTimeframe);
+                   }
+                 }}
+                 size="small"
+               >
+-                <ToggleButton value="daily">Daily</ToggleButton>
+-                <ToggleButton value="weekly">Weekly</ToggleButton>
++                {availableTimeframes.map((candidate) => (
++                  <ToggleButton key={candidate.value} value={candidate.value}>
++                    {candidate.label}
++                  </ToggleButton>
++                ))}
+               </ToggleButtonGroup>
+               {/* RS line overlay toggle — shown only where RS data can load
+                   (live charts, or static charts whose bundle carries rs_line). */}
+@@ -572,7 +644,7 @@ function CandlestickChart({
+                   <ToggleButton
+                     value="rs"
+                     selected={showRSLine}
+-                    disabled={effectiveTimeframe !== 'daily'}
++                    disabled={!isDailyTimeframe(effectiveTimeframe)}
+                     onClick={() => setShowRSLine((prev) => !prev)}
+                     title="RS line (stock vs. benchmark) with blue-dot leadership signals"
+                   >
+diff --git a/frontend/src/components/Charts/candlestickData.js b/frontend/src/components/Charts/candlestickData.js
+index bf8dd025..64be6281 100644
+--- a/frontend/src/components/Charts/candlestickData.js
++++ b/frontend/src/components/Charts/candlestickData.js
+@@ -24,30 +24,36 @@ export const calculateEMA = (data, period) => {
+   return emaData;
+ };
+
+-/**
+- * Aggregate daily data to weekly
+- */
+-export const aggregateToWeekly = (dailyData) => {
++const bucketForTimeframe = (day, timeframe) => {
++  const date = new Date(`${day.date}T00:00:00Z`);
++  const year = date.getUTCFullYear();
++  const month = date.getUTCMonth();
++
++  if (timeframe === 'weekly') {
++    const weekStart = new Date(date);
++    weekStart.setUTCDate(date.getUTCDate() - date.getUTCDay());
++    return weekStart.toISOString().split('T')[0];
++  }
++  if (timeframe === 'monthly') return `${year}-${String(month + 1).padStart(2, '0')}`;
++  if (timeframe === 'quarterly') return `${year}-Q${Math.floor(month / 3) + 1}`;
++  return String(year);
++};
++
++/** Aggregate daily OHLCV rows to the selected calendar period. */
++export const aggregateByTimeframe = (dailyData, timeframe) => {
+   if (!dailyData || dailyData.length === 0) return [];
+
+-  const weeklyData = [];
+-  let currentWeek = null;
++  const aggregated = [];
++  let currentBucket = null;
+
+   dailyData.forEach((day) => {
+-    // Bucket weeks in UTC. `day.date` is a date-only string (UTC midnight); using
+-    // local getDay/setDate before a UTC toISOString() would shift week boundaries
+-    // by the viewer's timezone, so use the UTC getters/setters throughout.
+-    const date = new Date(`${day.date}T00:00:00Z`);
+-    const weekStart = new Date(date);
+-    weekStart.setUTCDate(date.getUTCDate() - date.getUTCDay()); // Start of week (Sunday, UTC)
+-    const weekKey = weekStart.toISOString().split('T')[0];
+-
+-    if (!currentWeek || currentWeek.weekKey !== weekKey) {
+-      if (currentWeek) {
+-        weeklyData.push(currentWeek.data);
++    const bucket = bucketForTimeframe(day, timeframe);
++    if (!currentBucket || currentBucket.bucket !== bucket) {
++      if (currentBucket) {
++        aggregated.push(currentBucket.data);
+       }
+-      currentWeek = {
+-        weekKey,
++      currentBucket = {
++        bucket,
+         data: {
+           date: day.date,
+           open: day.open,
+@@ -58,21 +64,23 @@ export const aggregateToWeekly = (dailyData) => {
+         }
+       };
+     } else {
+-      currentWeek.data.high = Math.max(currentWeek.data.high, day.high);
+-      currentWeek.data.low = Math.min(currentWeek.data.low, day.low);
+-      currentWeek.data.close = day.close;
+-      currentWeek.data.volume += day.volume;
+-      currentWeek.data.date = day.date; // Use latest date for the week
++      currentBucket.data.high = Math.max(currentBucket.data.high, day.high);
++      currentBucket.data.low = Math.min(currentBucket.data.low, day.low);
++      currentBucket.data.close = day.close;
++      currentBucket.data.volume += day.volume;
++      currentBucket.data.date = day.date;
+     }
+   });
+
+-  if (currentWeek) {
+-    weeklyData.push(currentWeek.data);
++  if (currentBucket) {
++    aggregated.push(currentBucket.data);
+   }
+
+-  return weeklyData;
++  return aggregated;
+ };
+
++export const aggregateToWeekly = (dailyData) => aggregateByTimeframe(dailyData, 'weekly');
++
+ /**
+  * Transform API data to TradingView Lightweight Charts format
+  */
+@@ -81,8 +89,11 @@ export const transformToCandlestickData = (apiData, timeframe = 'daily') => {
+     return { candlesticks: [], volume: [], ema10: [], ema20: [], ema50: [] };
+   }
+
+-  // Aggregate to weekly if needed
+-  const processedData = timeframe === 'weekly' ? aggregateToWeekly(apiData) : apiData;
++  const processedData = timeframe === 'five-day'
++    ? apiData.slice(-5)
++    : ['weekly', 'monthly', 'quarterly', 'yearly'].includes(timeframe)
++      ? aggregateByTimeframe(apiData, timeframe)
++      : apiData;
+
+   const candlesticks = [];
+   const volume = [];
+diff --git a/frontend/src/components/Charts/candlestickData.timeframes.test.js b/frontend/src/components/Charts/candlestickData.timeframes.test.js
+new file mode 100644
+index 00000000..c36addb7
+--- /dev/null
++++ b/frontend/src/components/Charts/candlestickData.timeframes.test.js
+@@ -0,0 +1,45 @@
++import { describe, expect, it } from 'vitest';
++import { aggregateByTimeframe, transformToCandlestickData } from './candlestickData';
++
++const day = (date, open, high, low, close, volume = 10) => ({
++  date, open, high, low, close, volume,
++});
++
++const rows = [
++  day('2025-12-31', 8, 10, 7, 9, 5),
++  day('2026-01-02', 10, 13, 9, 12, 10),
++  day('2026-01-30', 12, 15, 11, 14, 20),
++  day('2026-02-02', 15, 17, 13, 16, 30),
++  day('2026-04-01', 20, 23, 19, 22, 40),
++];
++
++describe('candlestick timeframe aggregation', () => {
++  it('builds monthly OHLCV from the daily source rows', () => {
++    expect(aggregateByTimeframe(rows, 'monthly')).toEqual([
++      day('2025-12-31', 8, 10, 7, 9, 5),
++      day('2026-01-30', 10, 15, 9, 14, 30),
++      day('2026-02-02', 15, 17, 13, 16, 30),
++      day('2026-04-01', 20, 23, 19, 22, 40),
++    ]);
++  });
++
++  it('builds quarterly and yearly OHLCV without another provider dataset', () => {
++    expect(aggregateByTimeframe(rows, 'quarterly').slice(-2)).toEqual([
++      day('2026-02-02', 10, 17, 9, 16, 60),
++      day('2026-04-01', 20, 23, 19, 22, 40),
++    ]);
++    expect(aggregateByTimeframe(rows, 'yearly').slice(-1)).toEqual([
++      day('2026-04-01', 10, 23, 9, 22, 100),
++    ]);
++  });
++
++  it('renders the five-day preset from the latest five daily bars', () => {
++    const sevenDays = Array.from({ length: 7 }, (_, index) => (
++      day(`2026-01-${String(index + 1).padStart(2, '0')}`, index, index + 2, index, index + 1)
++    ));
++    const transformed = transformToCandlestickData(sevenDays, 'five-day');
++    expect(transformed.candlesticks).toHaveLength(5);
++    expect(transformed.candlesticks[0].time).toBe('2026-01-03');
++    expect(transformed.candlesticks[4].time).toBe('2026-01-07');
++  });
++});
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+new file mode 100644
+index 00000000..5eab820a
+--- /dev/null
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -0,0 +1,40 @@
++export const CHART_TIMEFRAMES = [
++  { value: 'five-day', label: '5 Days', historyPeriod: '1mo' },
++  { value: 'daily', label: 'Daily K', historyPeriod: '6mo' },
++  { value: 'weekly', label: 'Weekly K', historyPeriod: '5y' },
++  { value: 'monthly', label: 'Monthly K', historyPeriod: '10y' },
++  { value: 'quarterly', label: 'Quarterly K', historyPeriod: '10y' },
++  { value: 'yearly', label: 'Yearly K', historyPeriod: '10y' },
++];
++
++export const historyPeriodForTimeframe = (timeframe, fallback = '6mo') => (
++  CHART_TIMEFRAMES.find((candidate) => candidate.value === timeframe)?.historyPeriod
++  ?? fallback
++);
++
++export const isDailyTimeframe = (timeframe) => timeframe === 'daily';
++
++export const clearRsOverlayForTimeframe = (timeframe, series, markers) => {
++  if (isDailyTimeframe(timeframe)) return false;
++  series?.setData?.([]);
++  markers?.setMarkers?.([]);
++  return true;
++};
++
++export const chartZoomDirection = (event) => {
++  if (!(event.metaKey || event.ctrlKey)) return null;
++  if (event.key === '+' || event.key === '=') return 'in';
++  if (event.key === '-' || event.key === '_') return 'out';
++  return null;
++};
++
++export const zoomedLogicalRange = (range, direction, barCount) => {
++  if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return null;
++  const span = range.to - range.from;
++  if (span <= 0) return null;
++
++  const maximum = Math.max(5, barCount);
++  const targetSpan = Math.min(maximum, Math.max(5, span * (direction === 'in' ? 0.8 : 1.25)));
++  const center = (range.from + range.to) / 2;
++  return { from: center - targetSpan / 2, to: center + targetSpan / 2 };
++};
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+new file mode 100644
+index 00000000..4a60cb02
+--- /dev/null
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -0,0 +1,48 @@
++import { describe, expect, it } from 'vitest';
++import {
++  chartZoomDirection,
++  clearRsOverlayForTimeframe,
++  historyPeriodForTimeframe,
++  isDailyTimeframe,
++  zoomedLogicalRange,
++} from './chartTimeframes';
++
++describe('chart timeframe controls', () => {
++  it('loads only the history window needed by the selected view', () => {
++    expect(historyPeriodForTimeframe('five-day')).toBe('1mo');
++    expect(historyPeriodForTimeframe('daily')).toBe('6mo');
++    expect(historyPeriodForTimeframe('weekly')).toBe('5y');
++    expect(historyPeriodForTimeframe('monthly')).toBe('10y');
++    expect(historyPeriodForTimeframe('quarterly')).toBe('10y');
++    expect(historyPeriodForTimeframe('yearly')).toBe('10y');
++  });
++
++  it('keeps the RS overlay on the full daily view only', () => {
++    expect(isDailyTimeframe('five-day')).toBe(false);
++    expect(isDailyTimeframe('daily')).toBe(true);
++    expect(isDailyTimeframe('weekly')).toBe(false);
++  });
++
++  it('clears an existing RS overlay synchronously before a non-daily fit', () => {
++    const calls = [];
++    const series = { setData: (value) => calls.push(['series', value]) };
++    const markers = { setMarkers: (value) => calls.push(['markers', value]) };
++
++    expect(clearRsOverlayForTimeframe('five-day', series, markers)).toBe(true);
++    expect(calls).toEqual([['series', []], ['markers', []]]);
++    expect(clearRsOverlayForTimeframe('daily', series, markers)).toBe(false);
++    expect(calls).toHaveLength(2);
++  });
++
++  it('recognizes command/control plus and minus without stealing plain keys', () => {
++    expect(chartZoomDirection({ metaKey: true, ctrlKey: false, key: '=' })).toBe('in');
++    expect(chartZoomDirection({ metaKey: false, ctrlKey: true, key: '-' })).toBe('out');
++    expect(chartZoomDirection({ metaKey: false, ctrlKey: false, key: '+' })).toBeNull();
++  });
++
++  it('zooms around the current center and respects visible data bounds', () => {
++    expect(zoomedLogicalRange({ from: 0, to: 100 }, 'in', 200)).toEqual({ from: 10, to: 90 });
++    expect(zoomedLogicalRange({ from: 25, to: 45 }, 'out', 200)).toEqual({ from: 22.5, to: 47.5 });
++    expect(zoomedLogicalRange({ from: 0, to: 100 }, 'out', 110)).toEqual({ from: -5, to: 105 });
++  });
++});
+diff --git a/frontend/src/components/Scan/ChartViewerModal.jsx b/frontend/src/components/Scan/ChartViewerModal.jsx
+index e6c9605e..0d154522 100644
+--- a/frontend/src/components/Scan/ChartViewerModal.jsx
++++ b/frontend/src/components/Scan/ChartViewerModal.jsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useRef, useState } from 'react';
++import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+ import {
+   Modal,
+   Box,
+@@ -68,6 +68,8 @@ function ChartViewerModal({
+   const [peerModalOpen, setPeerModalOpen] = useState(false);
+   const [setupDrawerOpen, setSetupDrawerOpen] = useState(false);
+   const [visibleRange, setVisibleRange] = useState(null); // Persist zoom across symbol navigation
++  const [chartReadySymbol, setChartReadySymbol] = useState(null);
++  const handleChartDataReady = useCallback((symbol) => setChartReadySymbol(symbol), []);
+
+   // Build API params from filter state
+   const filterParams = useMemo(
+@@ -93,7 +95,7 @@ function ChartViewerModal({
+   const { data: allSymbols, isLoading: symbolsLoading } = useQuery({
+     queryKey: ['allFilteredSymbols', scanId, filterCacheKey, sortBy, sortOrder],
+     queryFn: () => getAllFilteredSymbols(scanId, filterParams),
+-    enabled: open && !!scanId && !Array.isArray(navigationSymbolsOverride),
++    enabled: open && !!scanId && !!chartReadySymbol && !Array.isArray(navigationSymbolsOverride),
+     staleTime: 5000, // 5 seconds — short enough to catch mid-session sort changes
+     refetchOnMount: 'always', // Always refetch when modal opens to pick up sort changes
+   });
+@@ -130,6 +132,14 @@ function ChartViewerModal({
+     open
+   );
+
++  // Readiness belongs to one visible chart instance. Clear it before query
++  // subscriptions run whenever the modal closes/reopens or navigation changes
++  // the symbol, so an earlier A chart cannot authorize deferred work for a
++  // later A instance in an A -> B -> A cycle.
++  useLayoutEffect(() => {
++    setChartReadySymbol(null);
++  }, [open, currentSymbol]);
++
+   // Navigate to a specific symbol
+   const handleNavigateToSymbol = (symbol) => {
+     if (!navigationSymbols) return;
+@@ -149,7 +159,7 @@ function ChartViewerModal({
+   const { data: fetchedStockData } = useQuery({
+     queryKey: ['stockResult', scanId, currentSymbol],
+     queryFn: () => getSingleResult(scanId, currentSymbol),
+-    enabled: open && !!scanId && !!currentSymbol && !stockData,
++    enabled: open && !!scanId && chartReadySymbol === currentSymbol && !stockData,
+     staleTime: 300000, // 5 minutes
+   });
+
+@@ -189,7 +199,7 @@ function ChartViewerModal({
+   const { data: fundamentals } = useQuery({
+     queryKey: ['fundamentals', currentSymbol],
+     queryFn: () => getStockFundamentals(currentSymbol),
+-    enabled: open && !!currentSymbol,
++    enabled: open && chartReadySymbol === currentSymbol,
+     staleTime: 300000, // 5 minutes (data is cached 7 days server-side)
+   });
+
+@@ -204,7 +214,7 @@ function ChartViewerModal({
+   } = useQuery({
+     queryKey: ['groupRank', groupMarket, industryGroup],
+     queryFn: () => getGroupDetail(industryGroup, 1, groupMarket),
+-    enabled: open && !!industryGroup,
++    enabled: open && chartReadySymbol === currentSymbol && !!industryGroup,
+     staleTime: 300000, // 5 minutes
+     retry: false,
+   });
+@@ -256,16 +266,16 @@ function ChartViewerModal({
+     setSetupDrawerOpen(false);
+   }, [currentSymbol]);
+
+-  // Prefetch adjacent stocks (next 5 / prev 5) for smooth navigation.
++  // Prefetch the nearest adjacent stocks only after the current chart is ready.
+   // Price history and fundamentals each fetch in a single batch; the
+   // remaining per-symbol calls are the lean single-row scan result and the
+   // group rank (derivable up front from current-page rows, and shared across
+   // symbols in the same group).
+   useEffect(() => {
+-    if (!open || !currentSymbol || !navigationSymbols) return;
++    if (!open || !currentSymbol || chartReadySymbol !== currentSymbol || !navigationSymbols) return;
+
+-    const nextSymbols = navigationSymbols.slice(currentIndex + 1, currentIndex + 6);
+-    const prevSymbols = navigationSymbols.slice(Math.max(0, currentIndex - 5), currentIndex);
++    const nextSymbols = navigationSymbols.slice(currentIndex + 1, currentIndex + 3);
++    const prevSymbols = navigationSymbols.slice(Math.max(0, currentIndex - 2), currentIndex);
+     const adjacent = [...nextSymbols, ...prevSymbols].filter(Boolean);
+     if (adjacent.length === 0) return;
+
+@@ -303,7 +313,7 @@ function ChartViewerModal({
+         retry: false,
+       });
+     });
+-  }, [open, currentSymbol, currentIndex, navigationSymbols, queryClient, scanId, currentPageResults]);
++  }, [open, currentSymbol, chartReadySymbol, currentIndex, navigationSymbols, queryClient, scanId, currentPageResults]);
+
+   return (
+     <>
+@@ -549,6 +559,7 @@ function ChartViewerModal({
+                     height="100%"
+                     visibleRange={visibleRange}
+                     onVisibleRangeChange={setVisibleRange}
++                    onDataReady={handleChartDataReady}
+                   />
+                 ) : (
+                   <Box
+diff --git a/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+new file mode 100644
+index 00000000..90b903bf
+--- /dev/null
++++ b/frontend/src/components/Scan/ChartViewerModal.readiness.test.jsx
+@@ -0,0 +1,146 @@
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
++import { fireEvent, render, screen } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++import ChartViewerModal from './ChartViewerModal';
++
++let currentSymbol = 'AAA';
++
++const prefetchPriceHistoryBatch = vi.fn();
++const prefetchFundamentalsBatch = vi.fn();
++
++vi.mock('../../hooks/useChartNavigation', () => ({
++  useChartNavigation: () => ({
++    currentIndex: currentSymbol === 'AAA' ? 0 : 1,
++    currentSymbol,
++    totalCount: 2,
++    goNext: vi.fn(),
++    goPrevious: vi.fn(),
++    goToIndex: vi.fn(),
++  }),
++}));
++
++vi.mock('../Charts/CandlestickChart', () => ({
++  default: ({ symbol, onDataReady }) => (
++    <button type="button" onClick={() => onDataReady(symbol)}>
++      ready-{symbol}
++    </button>
++  ),
++}));
++
++vi.mock('../../api/priceHistory', () => ({
++  prefetchPriceHistoryBatch: (...args) => prefetchPriceHistoryBatch(...args),
++}));
++
++vi.mock('../../api/stocks', () => ({
++  getStockFundamentals: vi.fn(async () => ({})),
++  prefetchFundamentalsBatch: (...args) => prefetchFundamentalsBatch(...args),
++}));
++
++vi.mock('../../api/scans', () => ({
++  getAllFilteredSymbols: vi.fn(async () => ['AAA', 'BBB']),
++  getSetupDetails: vi.fn(async () => null),
++  getSingleResult: vi.fn(async () => ({})),
++}));
++
++vi.mock('../../api/groups', () => ({
++  getGroupDetail: vi.fn(async () => ({})),
++}));
++
++const renderModal = (queryClient, open = true) => render(
++  <QueryClientProvider client={queryClient}>
++    <ChartViewerModal
++      open={open}
++      onClose={vi.fn()}
++      initialSymbol="AAA"
++      scanId="scan-1"
++      navigationSymbolsOverride={['AAA', 'BBB']}
++      currentPageResults={[
++        { symbol: 'AAA', market: 'CN' },
++        { symbol: 'BBB', market: 'CN' },
++      ]}
++    />
++  </QueryClientProvider>
++);
++
++describe('ChartViewerModal readiness lifecycle', () => {
++  beforeEach(() => {
++    currentSymbol = 'AAA';
++    prefetchPriceHistoryBatch.mockClear();
++    prefetchFundamentalsBatch.mockClear();
++  });
++
++  it('requires fresh readiness after closing and reopening the same symbol', () => {
++    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++    const view = renderModal(queryClient);
++
++    fireEvent.click(screen.getByRole('button', { name: 'ready-AAA' }));
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++
++    view.rerender(
++      <QueryClientProvider client={queryClient}>
++        <ChartViewerModal
++          open={false}
++          onClose={vi.fn()}
++          initialSymbol="AAA"
++          scanId="scan-1"
++          navigationSymbolsOverride={['AAA', 'BBB']}
++          currentPageResults={[]}
++        />
++      </QueryClientProvider>
++    );
++    view.rerender(
++      <QueryClientProvider client={queryClient}>
++        <ChartViewerModal
++          open
++          onClose={vi.fn()}
++          initialSymbol="AAA"
++          scanId="scan-1"
++          navigationSymbolsOverride={['AAA', 'BBB']}
++          currentPageResults={[]}
++        />
++      </QueryClientProvider>
++    );
++
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++    fireEvent.click(screen.getByRole('button', { name: 'ready-AAA' }));
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(2);
++  });
++
++  it('does not reuse readiness across an A to B to A cycle', () => {
++    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++    const view = renderModal(queryClient);
++
++    fireEvent.click(screen.getByRole('button', { name: 'ready-AAA' }));
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++
++    currentSymbol = 'BBB';
++    view.rerender(
++      <QueryClientProvider client={queryClient}>
++        <ChartViewerModal
++          open
++          onClose={vi.fn()}
++          initialSymbol="AAA"
++          scanId="scan-1"
++          navigationSymbolsOverride={['AAA', 'BBB']}
++          currentPageResults={[]}
++        />
++      </QueryClientProvider>
++    );
++    currentSymbol = 'AAA';
++    view.rerender(
++      <QueryClientProvider client={queryClient}>
++        <ChartViewerModal
++          open
++          onClose={vi.fn()}
++          initialSymbol="AAA"
++          scanId="scan-1"
++          navigationSymbolsOverride={['AAA', 'BBB']}
++          currentPageResults={[]}
++        />
++      </QueryClientProvider>
++    );
++
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++  });
++});

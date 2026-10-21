@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "personal-quant-stack"
+version = "0.5.1"
+description = "Reproducible research contracts and adapters for a personal quant platform"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "pydantic>=2.10,<3",
+  "PyYAML>=6.0.2,<7",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+nautilus = ["nautilus-trader==1.215.0"]
+data = [
+  "duckdb>=1.4,<2",
+  "exchange-calendars==4.13.2",
+  "pyarrow>=19,<24",
+  "yfinance==1.5.2",
+]
+brokerage = ["schwab-py==1.5.1"]
+cn-live = [
+  "akshare==1.18.81",
+  "baostock==0.9.3",
+  "curl-cffi==0.15.0",
+  "tdxpy==0.2.7",
+]
+archive = ["psycopg[binary]>=3.2,<4", "pyarrow>=19,<24"]
+research = ["exchange-calendars==4.13.2", "pyarrow>=19,<24"]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8.3,<10",
+  "jsonschema>=4.23,<5",
+  "ruff>=0.12,<1",
+]
+
+[tool.uv]
+build-constraint-dependencies = [
+  "hatchling==1.31.0",
+  "packaging==26.2",
+  "pathspec==1.1.1",
+  "pluggy==1.6.0",
+  "trove-classifiers==2026.6.1.19",
+]
+
+[project.scripts]
+quant-stack = "quant_stack.cli:main"
+quant-stack-api = "quant_stack.api:run"
+quant-stack-ingest = "quant_stack.ingest_cli:main"
+quant-stack-daily = "quant_stack.daily_cli:main"
+quant-stack-ss-archive = "quant_stack.ss_archive_cli:main"
+quant-stack-ss-legacy-convert = "quant_stack.ss_legacy_conversion_cli:main"
+quant-stack-brokerage-sample = "quant_stack.brokerage_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quant_stack"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = [".", "src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

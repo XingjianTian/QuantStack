@@ -1,0 +1,61 @@
+{
+  "securitiesAccount": {
+    "accountId": "fictional-account",
+    "accountHash": "fictional-account-hash",
+    "type": "MARGIN",
+    "currency": "USD",
+    "nickname": "Fictional Ready Margin Sample",
+    "fixtureMetadata": {
+      "fictional": true,
+      "profile": "ready",
+      "accountBinding": "fictional-account/fictional-account-hash"
+    },
+    "currentBalances": {
+      "liquidationValue": "1000.00",
+      "cashBalance": "500.00",
+      "settledCash": "450.00",
+      "cashAvailableForTrading": "490.00",
+      "buyingPower": "980.00",
+      "cashAvailableForWithdrawal": "400.00",
+      "pendingOrders": "0.00",
+      "orderReservationIncluded": true
+    },
+    "positions": [
+      {
+        "positionId": "SAMPLE-POS-QXEN",
+        "asOf": "2026-10-16T00:00:00+00:00",
+        "longQuantity": "1.5",
+        "shortQuantity": "0",
+        "averagePrice": "35.00",
+        "marketValue": "52.50",
+        "costBasis": "52.50",
+        "instrument": {
+          "assetType": "EQUITY",
+          "symbol": "QXEN",
+          "description": "Fictional Utility Equity",
+          "currency": "USD"
+        }
+      },
+      {
+        "positionId": "SAMPLE-POS-OPTION",
+        "asOf": "2026-10-16T00:00:00+00:00",
+        "longQuantity": "1",
+        "shortQuantity": "0",
+        "averagePrice": "2.00",
+        "marketValue": "200.00",
+        "costBasis": "200.00",
+        "instrument": {
+          "assetType": "OPTION",
+          "symbol": "XYZ  261016C00200000",
+          "underlyingSymbol": "XYZ",
+          "optionExpirationDate": "2026-10-16",
+          "putCall": "CALL",
+          "strikePrice": "200.00",
+          "contractMultiplier": "100",
+          "deliverable": "100 shares of XYZ",
+          "currency": "USD"
+        }
+      }
+    ]
+  }
+}

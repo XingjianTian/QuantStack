@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/daily-r8-ledger-event/v1",
+  "title": "QuantStack Isolated R8 Ledger Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "event_type", "candidate_id", "ledger_revision", "source_kind"],
+  "properties": {
+    "schema_version": {"const": "quantstack.daily-r8-ledger-event.v1"},
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"const": "candidate_created"},
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\.\\.?$)(?!.*[\\\\/]).+$"
+    },
+    "ledger_revision": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "source_kind": {"type": "string", "minLength": 1}
+  }
+}

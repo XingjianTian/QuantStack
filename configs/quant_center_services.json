@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "groups": [
+    {"id": "center", "label": "Quant Center", "source": "quant-center"},
+    {"id": "screener", "label": "选股与市场", "source": "stock-screener"},
+    {"id": "research", "label": "AI 投研", "source": "vibe-trading"},
+    {"id": "execution", "label": "策略与回测", "source": "nautilus-trader"}
+  ],
+  "items": [
+    {"id": "center-overview", "label": "总览", "description": "平台状态、研究进度与数据新鲜度", "group": "center", "source": "quant-center", "icon": "layout-dashboard", "href": "/"},
+    {"id": "center-strategies", "label": "策略库", "description": "统一策略规格与生命周期", "group": "center", "source": "quant-center", "icon": "git-branch", "href": "/strategies"},
+    {"id": "center-experiments", "label": "实验记录", "description": "可复现回测与报告", "group": "center", "source": "quant-center", "icon": "history", "href": "/experiments"},
+    {"id": "center-data", "label": "数据中心", "description": "NAS 数据目录、版本与质量", "group": "center", "source": "quant-center", "icon": "database", "href": "/data"},
+    {"id": "center-services", "label": "服务状态", "description": "集成服务与运行边界", "group": "center", "source": "quant-center", "icon": "activity", "href": "/services"},
+    {"id": "center-navigation", "label": "导航定制", "description": "选择页面并调整顺序", "group": "center", "source": "quant-center", "icon": "panel-left", "href": "/navigation"},
+
+    {"id": "screener-daily", "label": "市场总览", "description": "A 股快照、市场宽度与候选股", "group": "screener", "source": "stock-screener", "icon": "chart-candlestick", "href": "{screener_url}/"},
+    {"id": "screener-scan", "label": "股票筛选", "description": "技术面与基本面条件扫描", "group": "screener", "source": "stock-screener", "icon": "scan-search", "href": "{screener_url}/scan"},
+    {"id": "screener-breadth", "label": "市场宽度", "description": "涨跌结构与环境判断", "group": "screener", "source": "stock-screener", "icon": "waves", "href": "{screener_url}/breadth"},
+    {"id": "screener-groups", "label": "行业排行", "description": "行业与分组相对强弱", "group": "screener", "source": "stock-screener", "icon": "layers-3", "href": "{screener_url}/groups"},
+    {"id": "screener-operations", "label": "数据任务", "description": "抓取、扫描和后台队列", "group": "screener", "source": "stock-screener", "icon": "server-cog", "href": "{screener_url}/operations"},
+
+    {"id": "vibe-agent", "label": "AI 研究助手", "description": "使用可信模型推进投研任务", "group": "research", "source": "vibe-trading", "icon": "bot", "href": "{vibe_url}/agent"},
+    {"id": "vibe-reports", "label": "研究报告", "description": "查看研究产出与运行记录", "group": "research", "source": "vibe-trading", "icon": "file-chart-column", "href": "{vibe_url}/reports"},
+    {"id": "vibe-alpha", "label": "Alpha 因子库", "description": "因子浏览、比较与评估", "group": "research", "source": "vibe-trading", "icon": "atom", "href": "{vibe_url}/alpha-zoo"},
+    {"id": "vibe-correlation", "label": "相关性矩阵", "description": "资产与因子相关性探索", "group": "research", "source": "vibe-trading", "icon": "grid-3x3", "href": "{vibe_url}/correlation"},
+    {"id": "vibe-runtime", "label": "智能体运行", "description": "工具调用与运行时状态", "group": "research", "source": "vibe-trading", "icon": "workflow", "href": "{vibe_url}/runtime"},
+
+    {"id": "nautilus-lab", "label": "Nautilus 研究台", "description": "独立的策略规格、实验和回测入口", "group": "execution", "source": "nautilus-trader", "icon": "ship-wheel", "href": "{nautilus_url}/"}
+  ]
+}

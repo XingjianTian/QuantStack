@@ -1,0 +1,89 @@
+diff --git a/frontend/src/pages/MarketScanPage.jsx b/frontend/src/pages/MarketScanPage.jsx
+index 70e1bc4..39fc5fa 100644
+--- a/frontend/src/pages/MarketScanPage.jsx
++++ b/frontend/src/pages/MarketScanPage.jsx
+@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+ import { Box, CircularProgress, Tabs, Tab, Paper } from '@mui/material';
+ import DailyMarketSnapshotTab from '../components/MarketScan/DailyMarketSnapshotTab';
+ import { useRuntime } from '../contexts/RuntimeContext';
++import { useMarket } from '../contexts/MarketContext';
+ 
+ const KeyMarketsTab = lazy(() => import('../components/MarketScan/KeyMarketsTab'));
+ const ThemesTab = lazy(() => import('../components/MarketScan/ThemesTab'));
+@@ -29,6 +30,7 @@ function renderLazyTab(TabComponent) {
+ 
+ function MarketScanPage() {
+   const { features } = useRuntime();
++  const { selectedMarket } = useMarket();
+   const [selectedTab, setSelectedTab] = useState(0);
+   // Daily Snapshot first: it renders from one cached payload, while Key
+   // Markets mounts the TradingView widget (~180 external requests) — only
+@@ -50,6 +52,10 @@ function MarketScanPage() {
+     }
+   }, [selectedTab, subTabs.length]);
+ 
++  useEffect(() => {
++    setSelectedTab(0);
++  }, [selectedMarket]);
++
+   return (
+     <Box sx={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
+       {/* Left sidebar with vertical tabs */}
+diff --git a/frontend/src/pages/MarketScanPage.test.jsx b/frontend/src/pages/MarketScanPage.test.jsx
+index 3cc1caa..394d5fc 100644
+--- a/frontend/src/pages/MarketScanPage.test.jsx
++++ b/frontend/src/pages/MarketScanPage.test.jsx
+@@ -9,6 +9,9 @@ const runtimeState = {
+     themes: false,
+   },
+ };
++const marketState = {
++  selectedMarket: 'US',
++};
+ const keyMarketsRenderSpy = vi.hoisted(() => vi.fn());
+ 
+ vi.mock('../contexts/RuntimeContext', () => ({
+@@ -16,5 +19,9 @@ vi.mock('../contexts/RuntimeContext', () => ({
+ }));
+ 
++vi.mock('../contexts/MarketContext', () => ({
++  useMarket: () => marketState,
++}));
++
+ vi.mock('../components/MarketScan/KeyMarketsTab', () => ({
+   default: () => {
+     keyMarketsRenderSpy();
+@@ -44,6 +51,7 @@ describe('MarketScanPage capability gating', () => {
+   beforeEach(() => {
+     keyMarketsRenderSpy.mockClear();
+     runtimeState.features = { themes: false };
++    marketState.selectedMarket = 'US';
+   });
+ 
+   it('removes the Themes tab when themes are disabled', () => {
+@@ -84,4 +92,25 @@ describe('MarketScanPage capability gating', () => {
+     expect(await screen.findByText('key-markets')).toBeInTheDocument();
+     expect(keyMarketsRenderSpy).toHaveBeenCalled();
+   });
++
++  it('returns to Daily Snapshot when the global market changes', async () => {
++    const { rerender } = render(
++      <ThemeProvider theme={createTheme()}>
++        <MarketScanPage />
++      </ThemeProvider>
++    );
++
++    fireEvent.click(screen.getByRole('tab', { name: 'Watchlists' }));
++    expect(await screen.findByText('watchlists-tab')).toBeInTheDocument();
++
++    marketState.selectedMarket = 'CN';
++    rerender(
++      <ThemeProvider theme={createTheme()}>
++        <MarketScanPage />
++      </ThemeProvider>
++    );
++
++    expect(await screen.findByText('daily-snapshot-tab')).toBeInTheDocument();
++    expect(screen.getByRole('tab', { name: 'Daily Snapshot' })).toHaveAttribute('aria-selected', 'true');
++  });
+ });

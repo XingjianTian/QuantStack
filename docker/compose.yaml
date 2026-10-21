@@ -1,0 +1,18 @@
+services:
+  quant-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    working_dir: /workspace
+    command: ["uv", "run", "pytest"]
+    environment:
+      QUANT_DATA_ROOT: /quant-data
+      QUANT_EXPERIMENT_ROOT: /quant-data/experiments
+    volumes:
+      - ../:/workspace
+      - quant-venv:/workspace/.venv
+      - ${QUANT_DATA_ROOT:-../.local-data}:/quant-data
+    read_only: false
+
+volumes:
+  quant-venv:

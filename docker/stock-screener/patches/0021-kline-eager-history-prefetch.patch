@@ -1,0 +1,111 @@
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index f3adf915..20dc6f8c 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -86,6 +86,7 @@ function CandlestickChart({
+   const historyRequestPendingRef = useRef(false);
+   const historyExhaustedRef = useRef(false);
+   const historyDemandArmedRef = useRef(false);
++  const historyEagerStartedRef = useRef(false);
+   const appliedCandlesRef = useRef([]);
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+@@ -108,6 +109,7 @@ function CandlestickChart({
+     historyRequestPendingRef.current = false;
+     historyExhaustedRef.current = false;
+     historyDemandArmedRef.current = false;
++    historyEagerStartedRef.current = false;
+   }, [period, symbol]);
+ 
+   useEffect(() => {
+@@ -383,6 +385,32 @@ function CandlestickChart({
+       historyRequestPendingRef.current = false;
+     }
+   }, [apiData, effectiveTimeframe, queryClient, symbol]);
++
++  // Start the first ten-year history read as soon as the initial daily payload
++  // is visible. This keeps rapid pans inside already-loaded data instead of
++  // exposing a blank interval while a boundary-triggered request is in flight.
++  useEffect(() => {
++    if (
++      compact
++      || !interactive
++      || useBundledPriceData
++      || effectiveTimeframe !== 'daily'
++      || !priceRequestSettled
++      || !Array.isArray(baseApiData)
++      || baseApiData.length === 0
++      || historyEagerStartedRef.current
++    ) return;
++    historyEagerStartedRef.current = true;
++    loadOlderHistory();
++  }, [
++    baseApiData,
++    compact,
++    effectiveTimeframe,
++    interactive,
++    loadOlderHistory,
++    priceRequestSettled,
++    useBundledPriceData,
++  ]);
+ 
+   // Match the main-market chart's datafeed semantics: let Lightweight Charts
+   // own pan/drag momentum, then prefetch one older local page before the user
+diff --git a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+index be7026a4..ca5118a2 100644
+--- a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -95,19 +95,19 @@ describe('CandlestickChart streaming history', () => {
+     };
+   });
+ 
+-  it('does not prefetch on mount and keeps only one older-page request in flight', async () => {
++  it('eagerly prefetches one older page and keeps only one request in flight', async () => {
+     renderChart();
+ 
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+     await screen.findByText('12.00');
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
+     chartHarness.logicalRangeHandler({ from: 0, to: 1 });
+-    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
+ 
+     fireEvent.wheel(screen.getByTestId('candlestick-chart-canvas'));
+     chartHarness.logicalRangeHandler({ from: -1, to: 1 });
+     chartHarness.logicalRangeHandler({ from: -2, to: 0 });
+ 
+-    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
+     expect(chartHarness.fetchRange).toHaveBeenCalledWith(
+       '600000.SS',
+       '2016-03-03',
+@@ -117,14 +117,15 @@ describe('CandlestickChart streaming history', () => {
+   });
+ 
+   it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
+-    chartHarness.fetchRange.mockResolvedValue([
+-      { date: '2026-02-27', open: 8, high: 10, low: 7, close: 9, volume: 80 },
+-      { date: '2026-02-28', open: 9, high: 11, low: 8, close: 10, volume: 90 },
+-    ]);
++    let resolveRange;
++    chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
++      resolveRange = resolve;
++    }));
+     renderChart();
+ 
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+     await screen.findByText('12.00');
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
+     chartHarness.fitContent.mockClear();
+     chartHarness.setVisibleRange.mockClear();
+     chartHarness.setVisibleLogicalRange.mockClear();
+@@ -134,6 +135,10 @@ describe('CandlestickChart streaming history', () => {
+     fireEvent.wheel(canvas, { deltaX: 40, deltaY: 0 });
+     expect(chartHarness.setVisibleLogicalRange).not.toHaveBeenCalled();
+     chartHarness.logicalRangeHandler({ from: -20, to: 40 });
++    resolveRange([
++      { date: '2026-02-27', open: 8, high: 10, low: 7, close: 9, volume: 80 },
++      { date: '2026-02-28', open: 9, high: 11, low: 8, close: 10, volume: 90 },
++    ]);
+ 
+     await waitFor(() => expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledWith({
+       from: -18,

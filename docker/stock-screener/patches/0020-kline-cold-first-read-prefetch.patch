@@ -1,0 +1,95 @@
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index c4f2d004..f3adf915 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -12,6 +12,7 @@ import {
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
++  historyPrefetchBarsForRange,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+   mergePriceHistory,
+@@ -418,6 +419,7 @@ function CandlestickChart({
+         demandArmed: historyDemandArmedRef.current,
+         pending: historyRequestPendingRef.current,
+         exhausted: historyExhaustedRef.current,
++        threshold: historyPrefetchBarsForRange(range),
+       })) {
+         loadOlderHistory();
+       }
+diff --git a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+index f905fcfe..be7026a4 100644
+--- a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -110,7 +110,7 @@ describe('CandlestickChart streaming history', () => {
+     await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
+     expect(chartHarness.fetchRange).toHaveBeenCalledWith(
+       '600000.SS',
+-      '2025-01-25',
++      '2016-03-03',
+       '2026-02-28',
+       expect.objectContaining({ signal: expect.any(AbortSignal) }),
+     );
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index f9d8500f..2b2af913 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -22,9 +22,25 @@ export const chartPinchZoomDirection = (event) => {
+   return vertical < 0 ? 'in' : 'out';
+ };
+ 
+-export const STREAMING_HISTORY_PAGE_DAYS = 400;
++export const STREAMING_HISTORY_PAGE_DAYS = 3650;
+ export const STREAMING_HISTORY_PREFETCH_BARS = 50;
+ 
++export const historyPrefetchBarsForRange = (
++  range,
++  {
++    minimum = STREAMING_HISTORY_PREFETCH_BARS,
++    viewportMultiplier = 1.25,
++  } = {},
++) => {
++  if (
++    !range
++    || !Number.isFinite(range.from)
++    || !Number.isFinite(range.to)
++    || range.to <= range.from
++  ) return minimum;
++  return Math.max(minimum, Math.ceil((range.to - range.from) * viewportMultiplier));
++};
++
+ export const previousHistoryPage = (
+   earliestDate,
+   pageDays = STREAMING_HISTORY_PAGE_DAYS,
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index df2e75c4..33c870dd 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -4,6 +4,7 @@ import {
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
+   defaultShowRsLine,
++  historyPrefetchBarsForRange,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+   mergePriceHistory,
+@@ -42,6 +43,18 @@ describe('chart timeframe controls', () => {
+     expect(previousHistoryPage('2026-03-01', 0)).toBeNull();
+   });
+ 
++  it('loads a ten-year predecessor page by default', () => {
++    expect(previousHistoryPage('2026-03-01')).toEqual({
++      start: '2016-03-03',
++      end: '2026-02-28',
++    });
++  });
++
++  it('keeps at least one viewport of history prefetched', () => {
++    expect(historyPrefetchBarsForRange({ from: -20, to: 160 })).toBe(225);
++    expect(historyPrefetchBarsForRange(null)).toBe(50);
++  });
++
+   it('prefetches only after user demand enters the left threshold', () => {
+     expect(shouldPrefetchOlderHistory({ barsBefore: 50 }, { demandArmed: true })).toBe(true);
+     expect(shouldPrefetchOlderHistory({ barsBefore: 51 }, { demandArmed: true })).toBe(false);

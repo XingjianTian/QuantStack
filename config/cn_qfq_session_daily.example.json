@@ -1,0 +1,13 @@
+{
+  "schema_version": "quantstack.cn-qfq-session-daily.v1",
+  "repo_root": "${QUANT_STACK_ROOT}",
+  "python": "${QUANT_PYTHON}",
+  "data_root": "${QUANT_DATA_ROOT}",
+  "session_root": "${QUANT_RUNTIME_ROOT}/daily-sessions",
+  "work_root": "${QUANT_RUNTIME_ROOT}/cn-qfq-session-daily",
+  "provider_control_root": "${QUANT_RUNTIME_ROOT}/provider-control",
+  "instruments_path": "${QUANT_DATA_ROOT}/normalized/instruments/market=CN/version=current/instruments.parquet",
+  "ss_base_url": "${QUANT_SCREENER_BASE_URL}",
+  "ss_report_root": "${QUANT_RUNTIME_ROOT}/cn-qfq-session-daily/ss-reports",
+  "ss_report_gid": 997
+}

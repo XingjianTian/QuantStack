@@ -1,0 +1,320 @@
+diff --git a/frontend/src/utils/symbolMarket.js b/frontend/src/utils/symbolMarket.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/utils/symbolMarket.js
+@@ -0,0 +1,13 @@
++const CN_SUFFIXES = ['.SS', '.SZ', '.BJ'];
++
++export const marketFromSymbol = (symbol) => {
++  const normalized = String(symbol || '').trim().toUpperCase();
++  if (CN_SUFFIXES.some((suffix) => normalized.endsWith(suffix))) return 'CN';
++  return 'US';
++};
++
++export const filterRowsForMarket = (rows, market) => (
++  !market ? (rows || []) : (rows || []).filter((row) => (
++    String(row?.market || marketFromSymbol(row?.symbol)).toUpperCase() === String(market).toUpperCase()
++  ))
++);
+diff --git a/frontend/src/utils/symbolMarket.test.js b/frontend/src/utils/symbolMarket.test.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/utils/symbolMarket.test.js
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from 'vitest';
++
++import { filterRowsForMarket, marketFromSymbol } from './symbolMarket';
++
++describe('symbol market helpers', () => {
++  it('recognizes mainland suffixes and treats unsuffixed tickers as US', () => {
++    expect(marketFromSymbol('600519.SS')).toBe('CN');
++    expect(marketFromSymbol('000001.SZ')).toBe('CN');
++    expect(marketFromSymbol('920001.BJ')).toBe('CN');
++    expect(marketFromSymbol('AAPL')).toBe('US');
++  });
++
++  it('keeps only rows belonging to the selected market', () => {
++    const rows = [
++      { symbol: '600519.SS' },
++      { symbol: 'AAPL' },
++      { symbol: 'SPY', market: 'US' },
++    ];
++    expect(filterRowsForMarket(rows, 'CN').map((row) => row.symbol)).toEqual(['600519.SS']);
++    expect(filterRowsForMarket(rows, 'US').map((row) => row.symbol)).toEqual(['AAPL', 'SPY']);
++  });
++});
+diff --git a/frontend/src/components/Layout/MarketSelector.jsx b/frontend/src/components/Layout/MarketSelector.jsx
+--- a/frontend/src/components/Layout/MarketSelector.jsx
++++ b/frontend/src/components/Layout/MarketSelector.jsx
+@@ -25,6 +25,11 @@ function MarketSelector() {
+       size="small"
+       variant="standard"
+       disableUnderline
++      MenuProps={{
++        anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
++        transformOrigin: { vertical: 'top', horizontal: 'left' },
++        PaperProps: { sx: { mt: 0.5 } },
++      }}
+       inputProps={{ 'aria-label': 'Market selector' }}
+       renderValue={(code) => `${marketFlag(code)} ${code}`}
+       sx={{
+diff --git a/frontend/src/components/MarketScan/KeyMarketsTab.jsx b/frontend/src/components/MarketScan/KeyMarketsTab.jsx
+--- a/frontend/src/components/MarketScan/KeyMarketsTab.jsx
++++ b/frontend/src/components/MarketScan/KeyMarketsTab.jsx
+@@ -9,8 +9,11 @@ import TradingViewChart from './TradingViewChart';
+ import SymbolNavigator from './SymbolNavigator';
+ import WatchlistManager from './WatchlistManager';
+ import { getWatchlist } from '../../api/marketScan';
++import { useMarket } from '../../contexts/MarketContext';
++import { filterRowsForMarket } from '../../utils/symbolMarket';
+ 
+ function KeyMarketsTab() {
++  const { selectedMarket } = useMarket();
+   const [currentIndex, setCurrentIndex] = useState(0);
+   const [managerOpen, setManagerOpen] = useState(false);
+ 
+@@ -20,7 +23,7 @@ function KeyMarketsTab() {
+     queryFn: () => getWatchlist('key_markets'),
+   });
+ 
+-  const symbols = watchlist?.symbols || [];
++  const symbols = filterRowsForMarket(watchlist?.symbols, selectedMarket);
+   const currentSymbol = symbols[currentIndex];
+ 
+   // Navigation functions
+@@ -58,9 +61,11 @@ function KeyMarketsTab() {
+ 
+   // Reset index if it's out of bounds after list changes
+   useEffect(() => {
+-    if (currentIndex >= symbols.length && symbols.length > 0) {
+-      setCurrentIndex(0);
+-    }
++    setCurrentIndex(0);
++  }, [selectedMarket]);
++
++  useEffect(() => {
++    if (currentIndex >= symbols.length) setCurrentIndex(0);
+   }, [symbols.length, currentIndex]);
+ 
+   if (isLoading) {
+diff --git a/frontend/src/components/MarketScan/WatchlistsTab.jsx b/frontend/src/components/MarketScan/WatchlistsTab.jsx
+--- a/frontend/src/components/MarketScan/WatchlistsTab.jsx
++++ b/frontend/src/components/MarketScan/WatchlistsTab.jsx
+@@ -24,11 +24,14 @@
+ import WatchlistTable from './WatchlistTable';
+ import UserWatchlistManager from './UserWatchlistManager';
+ import { useStrategyProfileData } from '../../contexts/StrategyProfileContext';
++import { useMarket } from '../../contexts/MarketContext';
++import { filterRowsForMarket } from '../../utils/symbolMarket';
+ 
+ // Defers the lightweight-charts bundle until a chart is actually opened.
+ const WatchlistChartModal = lazy(() => import('./WatchlistChartModal'));
+ 
+ function WatchlistsTab() {
++  const { selectedMarket } = useMarket();
+   const { requestProfile } = useStrategyProfileData();
+   const [selectedWatchlistId, setSelectedWatchlistId] = useState(null);
+   const [managerOpen, setManagerOpen] = useState(false);
+@@ -91,7 +94,7 @@ function WatchlistsTab() {
+     if (!watchlistData) {
+       return null;
+     }
+-    const filteredItems = [...(watchlistData.items || [])]
++    const filteredItems = filterRowsForMarket(watchlistData.items, selectedMarket)
+       .filter((item) => statusFilter === 'all' || stewardshipBySymbol[item.symbol]?.status === statusFilter)
+       .sort((left, right) => {
+         const leftIndex = stewardshipOrder[left.symbol] ?? Number.MAX_SAFE_INTEGER;
+@@ -99,7 +102,7 @@ function WatchlistsTab() {
+         return leftIndex - rightIndex;
+       });
+     return { ...watchlistData, items: filteredItems };
+-  }, [statusFilter, stewardshipBySymbol, stewardshipOrder, watchlistData]);
++  }, [selectedMarket, statusFilter, stewardshipBySymbol, stewardshipOrder, watchlistData]);
+ 
+   const handleRefresh = () => {
+     refetchWatchlists();
+@@ -139,7 +142,7 @@ function WatchlistsTab() {
+     URL.revokeObjectURL(url);
+   };
+ 
+-  const watchlistSymbols = watchlistData?.items?.map((item) => item.symbol) || [];
++  const watchlistSymbols = filteredWatchlistData?.items?.map((item) => item.symbol) || [];
+ 
+   if (watchlistsLoading) {
+     return (
+diff --git a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
+--- a/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
++++ b/frontend/src/components/MarketScan/DailyMarketSnapshotTab.jsx
+@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
+ import {
+   Alert,
+   Box,
++  Button,
+   CircularProgress,
+   Grid,
+   MenuItem,
+@@ -50,6 +51,8 @@ function DailyMarketSnapshotTab() {
+     queryKey: ['dailySnapshot', selectedMarket],
+     queryFn: () => getDailySnapshot(selectedMarket),
+     staleTime: 60_000,
++    retry: 1,
++    retryDelay: 0,
+   });
+   const snapshot = snapshotQuery.data;
+   const scanId = snapshot?.scan_id ?? null;
+@@ -113,7 +116,14 @@ function DailyMarketSnapshotTab() {
+   }
+ 
+   if (snapshotQuery.isError) {
+-    return <Alert severity="error">Failed to load the daily snapshot.</Alert>;
++    return (
++      <Alert
++        severity="error"
++        action={<Button color="inherit" size="small" onClick={() => snapshotQuery.refetch()}>Retry</Button>}
++      >
++        Failed to load the daily snapshot.
++      </Alert>
++    );
+   }
+ 
+   const handleRowClick = (symbol) => {
+diff --git a/frontend/src/components/Charts/createPriceChartSeries.js b/frontend/src/components/Charts/createPriceChartSeries.js
+--- a/frontend/src/components/Charts/createPriceChartSeries.js
++++ b/frontend/src/components/Charts/createPriceChartSeries.js
+@@ -32,9 +32,22 @@ export function createPriceChartSeries(container, { width, height, isDarkMode, in
+       borderColor: isDarkMode ? '#485263' : '#cccccc',
+       timeVisible: true,
+       secondsVisible: false,
++      fixLeftEdge: true,
++      fixRightEdge: true,
++      lockVisibleTimeRangeOnResize: true,
+     },
+-    handleScroll: interactive,
+-    handleScale: interactive,
++    handleScroll: interactive ? {
++      mouseWheel: false,
++      pressedMouseMove: true,
++      horzTouchDrag: true,
++      vertTouchDrag: false,
++    } : false,
++    handleScale: interactive ? {
++      axisPressedMouseMove: true,
++      mouseWheel: false,
++      pinch: false,
++    } : false,
++    kineticScroll: { mouse: false, touch: false },
+   });
+ 
+   // Volume (bottom). Neutral scaleMargins; reapplied by the RS strip layout effect.
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -33,8 +33,23 @@ export const zoomedLogicalRange = (range, direction, barCount) => {
+   const span = range.to - range.from;
+   if (span <= 0) return null;
+ 
+-  const maximum = Math.max(5, barCount);
+-  const targetSpan = Math.min(maximum, Math.max(5, span * (direction === 'in' ? 0.8 : 1.25)));
++  const maximum = Math.max(4, barCount - 1);
++  const targetSpan = Math.min(maximum, Math.max(4, span * (direction === 'in' ? 0.8 : 1.25)));
+   const center = (range.from + range.to) / 2;
+-  return { from: center - targetSpan / 2, to: center + targetSpan / 2 };
++  return clampLogicalRange({ from: center - targetSpan / 2, to: center + targetSpan / 2 }, barCount);
+ };
++
++export const clampLogicalRange = (range, barCount) => {
++  if (!range || barCount < 2) return null;
++  const lastIndex = barCount - 1;
++  const span = Math.min(lastIndex, Math.max(0, range.to - range.from));
++  const from = Math.min(lastIndex - span, Math.max(0, range.from));
++  return { from, to: from + span };
++};
++
++export const pannedLogicalRange = (range, wheelDelta, barCount) => {
++  if (!range || !Number.isFinite(wheelDelta) || wheelDelta === 0) return null;
++  const span = range.to - range.from;
++  const shift = Math.sign(wheelDelta) * Math.max(1, span * Math.min(Math.abs(wheelDelta) / 800, 0.15));
++  return clampLogicalRange({ from: range.from + shift, to: range.to + shift }, barCount);
++};
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -4,6 +4,7 @@ import {
+   clearRsOverlayForTimeframe,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
++  pannedLogicalRange,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+ 
+@@ -43,6 +44,12 @@ describe('chart timeframe controls', () => {
+   it('zooms around the current center and respects visible data bounds', () => {
+     expect(zoomedLogicalRange({ from: 0, to: 100 }, 'in', 200)).toEqual({ from: 10, to: 90 });
+     expect(zoomedLogicalRange({ from: 25, to: 45 }, 'out', 200)).toEqual({ from: 22.5, to: 47.5 });
+-    expect(zoomedLogicalRange({ from: 0, to: 100 }, 'out', 110)).toEqual({ from: -5, to: 105 });
++    expect(zoomedLogicalRange({ from: 0, to: 100 }, 'out', 110)).toEqual({ from: 0, to: 109 });
+   });
++
++  it('pans without changing scale and stops at either data edge', () => {
++    expect(pannedLogicalRange({ from: 20, to: 60 }, 100, 200)).toEqual({ from: 25, to: 65 });
++    expect(pannedLogicalRange({ from: 0, to: 40 }, -100, 200)).toEqual({ from: 0, to: 40 });
++    expect(pannedLogicalRange({ from: 159, to: 199 }, 100, 200)).toEqual({ from: 159, to: 199 });
++  });
+ });
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -12,6 +12,7 @@ import {
+   clearRsOverlayForTimeframe,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
++  pannedLogicalRange,
+   zoomedLogicalRange,
+ } from './chartTimeframes';
+ 
+@@ -298,10 +299,43 @@ function CandlestickChart({
+   useEffect(() => {
+     if (!chartRef.current) return;
+     chartRef.current.applyOptions({
+-      handleScroll: interactive,
+-      handleScale: interactive,
++      handleScroll: interactive ? {
++        mouseWheel: false,
++        pressedMouseMove: true,
++        horzTouchDrag: true,
++        vertTouchDrag: false,
++      } : false,
++      handleScale: interactive ? {
++        axisPressedMouseMove: true,
++        mouseWheel: false,
++        pinch: false,
++      } : false,
+     });
+   }, [interactive]);
++
++  // Trackpad scrolling pans by a clamped logical range and never changes the
++  // visible bar count. Browser pinch emits ctrl+wheel, which is the only wheel
++  // gesture that changes scale.
++  useEffect(() => {
++    const container = chartContainerRef.current;
++    if (!container || compact || !interactive) return undefined;
++
++    const handleWheel = (event) => {
++      if (!chartRef.current) return;
++      const timeScale = chartRef.current.timeScale();
++      const current = timeScale.getVisibleLogicalRange();
++      const barCount = chartData?.candlesticks?.length ?? 0;
++      const next = event.ctrlKey
++        ? zoomedLogicalRange(current, event.deltaY < 0 ? 'in' : 'out', barCount)
++        : pannedLogicalRange(current, event.deltaX || event.deltaY, barCount);
++      if (!next) return;
++      event.preventDefault();
++      timeScale.setVisibleLogicalRange(next);
++    };
++
++    container.addEventListener('wheel', handleWheel, { passive: false });
++    return () => container.removeEventListener('wheel', handleWheel);
++  }, [chartData?.candlesticks?.length, compact, interactive]);
+ 
+   // Subscribe to visible time range changes
+   useEffect(() => {

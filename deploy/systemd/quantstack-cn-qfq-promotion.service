@@ -1,0 +1,13 @@
+[Unit]
+Description=QuantStack A-share qfq Catalog and Stock Screener promotion
+After=network-online.target quantstack-daily.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/quantstack/cn-qfq-promotion.env
+ExecStart=/usr/bin/env PYTHONPATH=${QUANTSTACK_QFQ_REPO}/src:${QUANTSTACK_QFQ_REPO} ${QUANTSTACK_QFQ_PYTHON} ${QUANTSTACK_QFQ_REPO}/scripts/run_cn_qfq_session_daily.py --config ${QUANTSTACK_QFQ_CONFIG} --state ${QUANTSTACK_QFQ_STATE}
+Nice=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,152 @@
+--- a/frontend/src/components/Stock/StockDetails.jsx
++++ b/frontend/src/components/Stock/StockDetails.jsx
+@@ -139,6 +139,26 @@ function InfoBox({ label, value }) {
+   );
+ }
+ 
++function StockChartWorkspace({ symbol, stockData = null, fundamentals = null, onViewPeers }) {
++  return (
++    <Box sx={{ display: 'flex', borderBottom: 1, borderColor: 'divider', height: 520 }}>
++      <StockMetricsSidebar
++        stockData={stockData}
++        fundamentals={fundamentals || {}}
++        onViewPeers={onViewPeers}
++      />
++      <Box sx={{ flex: 1, overflow: 'hidden', bgcolor: 'background.paper' }}>
++        <CandlestickChart
++          key={symbol}
++          symbol={symbol}
++          period="6mo"
++          height={520}
++        />
++      </Box>
++    </Box>
++  );
++}
++
+ function StockDetails() {
+   const { ticker: symbol } = useParams();
+   const navigate = useNavigate();
+@@ -174,8 +194,23 @@ function StockDetails() {
+ 
+   if (isLoading || (isLoadingProfiles && !requestProfile)) {
+     return (
+-      <Box display="flex" justifyContent="center" py={6}>
+-        <CircularProgress />
++      <Box>
++        <Box
++          sx={{
++            display: 'flex',
++            alignItems: 'center',
++            justifyContent: 'space-between',
++            px: 2,
++            py: 1.5,
++            borderBottom: 1,
++            borderColor: 'divider',
++            bgcolor: 'background.default',
++          }}
++        >
++          <Typography variant="h5" fontWeight="bold">{symbol}</Typography>
++          <CircularProgress size={20} aria-label="Loading stock analysis" />
++        </Box>
++        <StockChartWorkspace symbol={symbol} />
+       </Box>
+     );
+   }
+@@ -323,21 +358,12 @@ function StockDetails() {
+       )}
+ 
+       {/* ─── Split Panel: Sidebar + Chart ─── */}
+-      <Box sx={{ display: 'flex', borderBottom: 1, borderColor: 'divider', height: 520 }}>
+-        <StockMetricsSidebar
+-          stockData={(data.chart?.chart_data?.source !== 'unavailable' && data.chart?.chart_data) || null}
+-          fundamentals={sidebarFundamentals}
+-          onViewPeers={() => setPeerModalOpen(true)}
+-        />
+-        <Box sx={{ flex: 1, overflow: 'hidden', bgcolor: 'background.paper' }}>
+-          <CandlestickChart
+-            key={data.symbol}
+-            symbol={data.symbol}
+-            priceData={data.chart?.price_history || []}
+-            height={520}
+-          />
+-        </Box>
+-      </Box>
++      <StockChartWorkspace
++        symbol={data.symbol}
++        stockData={(data.chart?.chart_data?.source !== 'unavailable' && data.chart?.chart_data) || null}
++        fundamentals={sidebarFundamentals}
++        onViewPeers={() => setPeerModalOpen(true)}
++      />
+ 
+       {/* ─── Accordion Sections ─── */}
+       <Box sx={{ mt: 1 }}>
+--- a/frontend/src/components/Stock/StockDetails.test.jsx
++++ b/frontend/src/components/Stock/StockDetails.test.jsx
+@@ -52,6 +52,8 @@ vi.mock('../Scan/StockMetricsSidebar', () => ({
+ describe('StockDetails', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
++    getStockDecisionDashboard.mockReset();
++    getStockValidation.mockReset();
+     strategyProfileState.current = {
+       activeProfile: 'default',
+       effectiveProfile: 'default',
+@@ -68,6 +70,27 @@ describe('StockDetails', () => {
+     };
+   });
+ 
++  it('mounts the deep-history chart before the decision dashboard resolves', async () => {
++    getStockDecisionDashboard.mockReturnValue(new Promise(() => {}));
++    getStockValidation.mockReturnValue(new Promise(() => {}));
++
++    renderWithProviders(
++      <MemoryRouter initialEntries={['/stocks/600519.SS']}>
++        <Routes>
++          <Route path="/stocks/:ticker" element={<StockDetails />} />
++        </Routes>
++      </MemoryRouter>
++    );
++
++    expect(await screen.findByTestId('candlestick-chart')).toHaveTextContent('600519.SS');
++    expect(screen.getByRole('progressbar', { name: 'Loading stock analysis' })).toBeInTheDocument();
++    expect(candlestickChartPropsSpy.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
++      symbol: '600519.SS',
++      period: '6mo',
++    }));
++    expect(candlestickChartPropsSpy.mock.calls.at(-1)?.[0]?.priceData).toBeUndefined();
++  });
++
+   it('renders the decision workspace from dashboard payload', async () => {
+     getStockDecisionDashboard.mockResolvedValue({
+       symbol: 'NVDA',
+@@ -223,8 +246,7 @@ describe('StockDetails', () => {
+       </MemoryRouter>
+     );
+ 
+-    expect(await screen.findByRole('heading', { name: 'NVDA' })).toBeInTheDocument();
+-    expect(screen.getByText('NVIDIA Corp')).toBeInTheDocument();
++    expect(await screen.findByText('NVIDIA Corp')).toBeInTheDocument();
+     expect(screen.getByText('Decision Summary')).toBeInTheDocument();
+     expect(screen.getByText('Event Risk & Action Plan')).toBeInTheDocument();
+     expect(screen.getByText('Historical Validation')).toBeInTheDocument();
+@@ -297,8 +319,7 @@ describe('StockDetails', () => {
+       </MemoryRouter>
+     );
+ 
+-    expect(await screen.findByRole('heading', { name: 'NVDA' })).toBeInTheDocument();
+-    expect(screen.getByText(/workspace is partially degraded/i)).toBeInTheDocument();
++    expect(await screen.findByText(/workspace is partially degraded/i)).toBeInTheDocument();
+     expect(screen.getByTestId('stock-metrics-sidebar')).toBeInTheDocument();
+     expect(screen.getByTestId('candlestick-chart')).toHaveTextContent('NVDA');
+     expect(screen.getByText('Decision Summary')).toBeInTheDocument();
+@@ -342,8 +363,7 @@ describe('StockDetails', () => {
+       </MemoryRouter>
+     );
+ 
+-    expect(await screen.findByRole('heading', { name: 'NVDA' })).toBeInTheDocument();
+-    expect(screen.getByText('Event Risk & Action Plan')).toBeInTheDocument();
++    expect(await screen.findByText('Event Risk & Action Plan')).toBeInTheDocument();
+     expect(screen.getByText('Historical Validation')).toBeInTheDocument();
+     expect(screen.getByText(/validation is partially degraded/i)).toBeInTheDocument();
+     expect(screen.queryByText('Scan Picks')).not.toBeInTheDocument();

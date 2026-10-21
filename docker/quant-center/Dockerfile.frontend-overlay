@@ -1,0 +1,9 @@
+ARG BASE_IMAGE=personal/quant-center-web:0.3.0
+FROM ${BASE_IMAGE}
+
+# Reuse the validated hardened Nginx runtime and replace only immutable assets.
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY dist/ /usr/share/nginx/html/
+
+LABEL org.opencontainers.image.version="0.9.14" \
+      io.sudox.quant.service="platform-home-with-shared-navigation"

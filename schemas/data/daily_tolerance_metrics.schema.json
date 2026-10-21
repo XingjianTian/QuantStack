@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/daily-tolerance-metrics/v1",
+  "title": "QuantStack Daily Tolerance Metrics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "market",
+    "session",
+    "snapshot_id",
+    "requested_count",
+    "returned_count",
+    "no_bar_count",
+    "unresolved_count",
+    "bar_coverage",
+    "exact_closure",
+    "ledger_closure",
+    "critical_unresolved_count",
+    "max_unresolved_concentration",
+    "missing_weight_ratio",
+    "max_consecutive_unresolved"
+  ],
+  "properties": {
+    "schema_version": {"const": "quantstack.daily-tolerance-metrics.v1"},
+    "market": {"type": "string", "minLength": 1},
+    "session": {"type": "string", "format": "date"},
+    "snapshot_id": {"type": "string", "minLength": 1},
+    "requested_count": {"type": "integer", "minimum": 0},
+    "returned_count": {"type": "integer", "minimum": 0},
+    "no_bar_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of no_bar identities backed by explicit evidence; rejected no_bar claims remain unresolved."
+    },
+    "unresolved_count": {"type": "integer", "minimum": 0},
+    "bar_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+    "exact_closure": {"type": "number", "minimum": 0, "maximum": 1},
+    "ledger_closure": {"type": "number", "minimum": 0, "maximum": 1},
+    "critical_unresolved_count": {"type": "integer", "minimum": 0},
+    "max_unresolved_concentration": {"type": "number", "minimum": 0, "maximum": 1},
+    "missing_weight_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+    "max_consecutive_unresolved": {"type": "integer", "minimum": 0}
+  }
+}

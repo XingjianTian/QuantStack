@@ -1,0 +1,288 @@
+diff --git a/frontend/src/api/priceHistory.js b/frontend/src/api/priceHistory.js
+index d539dff2..daff63e8 100644
+--- a/frontend/src/api/priceHistory.js
++++ b/frontend/src/api/priceHistory.js
+@@ -10,9 +10,10 @@ import apiClient from './client';
+  * @param {string} period - Time period (default: '6mo')
+  * @returns {Promise<Array>} Price history data with OHLCV and moving averages
+  */
+-export const fetchPriceHistory = async (symbol, period = '6mo') => {
++export const fetchPriceHistory = async (symbol, period = '6mo', { signal } = {}) => {
+   const response = await apiClient.get(`/v1/stocks/${symbol}/history`, {
+     params: { period },
++    signal,
+   });
+   return response.data;
+ };
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index 77432194..07df09eb 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -11,6 +11,7 @@ import {
+   chartPinchZoomDirection,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
++  currentHistoryPage,
+   defaultShowRsLine,
+   historyPageIsExhausted,
+   historyPrefetchBarsForRange,
+@@ -118,6 +119,10 @@ function CandlestickChart({
+       ? period
+       : historyPeriodForTimeframe(effectiveTimeframe, period));
+   const useBundledPriceData = usesBundledPriceData(effectiveTimeframe, priceData);
++  const initialHistoryRange = useMemo(
++    () => (usesSharedInteractiveHistory ? currentHistoryPage() : null),
++    [usesSharedInteractiveHistory],
++  );
+
+   useEffect(() => {
+     setOlderDailyData([]);
+@@ -147,7 +152,16 @@ function CandlestickChart({
+     dataUpdatedAt,
+   } = useQuery({
+     queryKey: priceHistoryKeys.symbol(symbol, historyPeriod),
+-    queryFn: () => fetchPriceHistory(symbol, historyPeriod),
++    queryFn: ({ signal }) => (
++      initialHistoryRange
++        ? fetchPriceHistoryRange(
++          symbol,
++          initialHistoryRange.start,
++          initialHistoryRange.end,
++          { signal },
++        )
++        : fetchPriceHistory(symbol, historyPeriod, { signal })
++    ),
+     enabled: !!symbol && !useBundledPriceData,
+     staleTime: PRICE_HISTORY_STALE_TIME,
+     keepPreviousData: true,
+diff --git a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+index c6eee1f5..88d82b9e 100644
+--- a/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -78,15 +78,18 @@ const renderChart = (props = {}) => {
+   );
+ };
+
++const INITIAL_BARS = [
++  { date: '2026-03-01', open: 10, high: 12, low: 9, close: 11, volume: 100 },
++  { date: '2026-03-02', open: 11, high: 13, low: 10, close: 12, volume: 120 },
++];
++
+ describe('CandlestickChart streaming history', () => {
+   beforeEach(() => {
+     chartHarness.logicalRangeHandler = null;
+     chartHarness.fetchHistory.mockReset();
+-    chartHarness.fetchHistory.mockResolvedValue([
+-      { date: '2026-03-01', open: 10, high: 12, low: 9, close: 11, volume: 100 },
+-      { date: '2026-03-02', open: 11, high: 13, low: 10, close: 12, volume: 120 },
+-    ]);
++    chartHarness.fetchHistory.mockResolvedValue(INITIAL_BARS);
+     chartHarness.fetchRange.mockReset();
++    chartHarness.fetchRange.mockResolvedValue(INITIAL_BARS);
+     chartHarness.fetchRs.mockReset();
+     chartHarness.fetchRs.mockResolvedValue(null);
+     chartHarness.fitContent.mockReset();
+@@ -94,55 +97,62 @@ describe('CandlestickChart streaming history', () => {
+     chartHarness.getVisibleLogicalRange.mockReturnValue({ from: 0, to: 1 });
+     chartHarness.setVisibleRange.mockReset();
+     chartHarness.setVisibleLogicalRange.mockReset();
+-    chartHarness.fetchRange.mockImplementation(() => new Promise(() => {}));
+     globalThis.ResizeObserver = class {
+       observe() {}
+       disconnect() {}
+     };
+   });
+
+-  it('paints two years without starting a predecessor read and keeps a fixed tail width', async () => {
++  it('paints one bounded range page without starting a predecessor read and keeps a fixed tail width', async () => {
+     renderChart();
+
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+     await screen.findByText('12.00');
+-    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
+-    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++    expect(chartHarness.fetchHistory).not.toHaveBeenCalled();
++    expect(chartHarness.fetchRange).toHaveBeenCalledOnce();
++    expect(chartHarness.fetchRange).toHaveBeenCalledWith(
++      '600000.SS',
++      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
++      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
++      expect.objectContaining({ signal: expect.any(AbortSignal) }),
++    );
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+     expect(chartHarness.setVisibleLogicalRange).toHaveBeenCalledWith({ from: 0, to: 1 });
+   });
+
+   it('does not set an invalid logical range while the cold request is still empty', async () => {
+-    chartHarness.fetchHistory.mockImplementation(() => new Promise(() => {}));
++    chartHarness.fetchRange.mockImplementation(() => new Promise(() => {}));
+
+     renderChart();
+
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+-    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
++    expect(chartHarness.fetchHistory).not.toHaveBeenCalled();
++    expect(chartHarness.fetchRange).toHaveBeenCalledOnce();
+     expect(chartHarness.setVisibleLogicalRange).not.toHaveBeenCalled();
+     expect(chartHarness.fitContent).not.toHaveBeenCalled();
+   });
+
+   it('shares one initial request and one user-demanded page across every interactive timeframe', async () => {
+     let resolveRange;
+-    chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+-      resolveRange = resolve;
+-    }));
++    chartHarness.fetchRange
++      .mockResolvedValueOnce(INITIAL_BARS)
++      .mockImplementationOnce(() => new Promise((resolve) => {
++        resolveRange = resolve;
++      }));
+     renderChart();
+
+     await screen.findByText('12.00');
+-    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++    expect(chartHarness.fetchRange).toHaveBeenCalledOnce();
+     for (const label of ['Weekly K', 'Monthly K', 'Quarterly K', 'Yearly K', 'Daily K']) {
+       fireEvent.click(screen.getByRole('button', { name: label }));
+     }
+
+-    expect(chartHarness.fetchHistory).toHaveBeenCalledTimes(1);
+-    expect(chartHarness.fetchHistory).toHaveBeenCalledWith('600000.SS', '2y');
+-    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++    expect(chartHarness.fetchHistory).not.toHaveBeenCalled();
++    expect(chartHarness.fetchRange).toHaveBeenCalledOnce();
+
+     fireEvent.wheel(screen.getByTestId('candlestick-chart-canvas'), { deltaX: 40, deltaY: 0 });
+     chartHarness.logicalRangeHandler({ from: -20, to: 40 });
+-    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(2));
+
+     resolveRange([
+       { date: '2025-01-02', open: 8, high: 10, low: 7, close: 9, volume: 80 },
+@@ -166,7 +176,9 @@ describe('CandlestickChart streaming history', () => {
+   });
+
+   it('locks an exhausted shared history edge for non-daily timeframes', async () => {
+-    chartHarness.fetchRange.mockResolvedValue([]);
++    chartHarness.fetchRange
++      .mockResolvedValueOnce(INITIAL_BARS)
++      .mockResolvedValueOnce([]);
+     renderChart();
+
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+@@ -178,7 +190,7 @@ describe('CandlestickChart streaming history', () => {
+     ).toHaveAttribute('data-history-state', 'exhausted'));
+     fireEvent.click(screen.getByRole('button', { name: 'Weekly K' }));
+     chartHarness.logicalRangeHandler({ from: -20, to: 40 });
+-    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(2);
+   });
+
+   it('cancels a delayed RS request when foreground history takes priority', async () => {
+@@ -194,7 +206,7 @@ describe('CandlestickChart streaming history', () => {
+     fireEvent.wheel(canvas, { deltaX: 40, deltaY: 0 });
+     chartHarness.logicalRangeHandler({ from: -20, to: 40 });
+
+-    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(2));
+     expect(rsSignal.aborted).toBe(true);
+   });
+
+@@ -210,16 +222,18 @@ describe('CandlestickChart streaming history', () => {
+     chartHarness.logicalRangeHandler({ from: -20, to: 40 });
+
+     await waitFor(() => expect(onForegroundHistoryStart).toHaveBeenCalledWith('600000.SS'));
+-    expect(chartHarness.fetchRange).not.toHaveBeenCalled();
++    expect(chartHarness.fetchRange).toHaveBeenCalledOnce();
+     releaseForeground();
+-    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(2));
+   });
+
+   it('keeps pan width fixed while prepending history and zooms only for pinch', async () => {
+     let resolveRange;
+-    chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
+-      resolveRange = resolve;
+-    }));
++    chartHarness.fetchRange
++      .mockResolvedValueOnce(INITIAL_BARS)
++      .mockImplementationOnce(() => new Promise((resolve) => {
++        resolveRange = resolve;
++      }));
+     renderChart();
+
+     await waitFor(() => expect(chartHarness.logicalRangeHandler).toBeTypeOf('function'));
+@@ -233,8 +247,9 @@ describe('CandlestickChart streaming history', () => {
+     fireEvent.wheel(canvas, { deltaX: 40, deltaY: 0 });
+     expect(chartHarness.setVisibleLogicalRange).not.toHaveBeenCalled();
+     chartHarness.logicalRangeHandler({ from: -20, to: 40 });
+-    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1));
+-    expect(chartHarness.fetchRange).toHaveBeenCalledWith(
++    await waitFor(() => expect(chartHarness.fetchRange).toHaveBeenCalledTimes(2));
++    expect(chartHarness.fetchRange).toHaveBeenNthCalledWith(
++      2,
+       '600000.SS',
+       '2025-01-25',
+       '2026-02-28',
+@@ -253,7 +268,7 @@ describe('CandlestickChart streaming history', () => {
+     expect(chartHarness.setVisibleRange).not.toHaveBeenCalled();
+
+     chartHarness.logicalRangeHandler({ from: -18, to: 42 });
+-    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(1);
++    expect(chartHarness.fetchRange).toHaveBeenCalledTimes(2);
+
+     chartHarness.setVisibleLogicalRange.mockClear();
+     chartHarness.getVisibleLogicalRange.mockReturnValue({ from: 20, to: 80 });
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index 40403999..b6376dde 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -26,6 +26,20 @@ export const STREAMING_HISTORY_PAGE_DAYS = 400;
+ export const STREAMING_HISTORY_PREFETCH_BARS = 50;
+ const HISTORY_START_GAP_TOLERANCE_DAYS = 31;
+
++export const currentHistoryPage = (
++  endDate = new Date(),
++  pageDays = STREAMING_HISTORY_PAGE_DAYS,
++) => {
++  if (!Number.isInteger(pageDays) || pageDays < 1) return null;
++  const end = new Date(endDate);
++  if (Number.isNaN(end.getTime())) return null;
++  end.setUTCHours(0, 0, 0, 0);
++  const start = new Date(end);
++  start.setUTCDate(start.getUTCDate() - pageDays + 1);
++  const format = (value) => value.toISOString().slice(0, 10);
++  return { start: format(start), end: format(end) };
++};
++
+ const TIMEFRAME_VISIBLE_BARS = {
+   'five-day': 5,
+   daily: 130,
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index 5b9c4280..a1eaa960 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -3,6 +3,7 @@ import {
+   chartPinchZoomDirection,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
++  currentHistoryPage,
+   defaultShowRsLine,
+   historyPageIsExhausted,
+   historyPrefetchBarsForRange,
+@@ -27,6 +28,15 @@ describe('chart gesture semantics', () => {
+ });
+
+ describe('chart timeframe controls', () => {
++  it('uses one bounded range page for the interactive first paint', () => {
++    expect(currentHistoryPage(new Date('2026-09-04T18:30:00Z'))).toEqual({
++      start: '2025-08-01',
++      end: '2026-09-04',
++    });
++    expect(currentHistoryPage('bad-date')).toBeNull();
++    expect(currentHistoryPage(new Date(), 0)).toBeNull();
++  });
++
+   it('loads only the history window needed by the selected view', () => {
+     expect(historyPeriodForTimeframe('five-day')).toBe('1mo');
+     expect(historyPeriodForTimeframe('daily')).toBe('6mo');

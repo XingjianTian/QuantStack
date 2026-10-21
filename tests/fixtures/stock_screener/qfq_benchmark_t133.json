@@ -1,0 +1,44 @@
+{
+  "schema_version": "ss.qfq-benchmark.v1",
+  "factor_source": "BaoStock query_adjust_factor",
+  "independent_event_source": "T110 frozen YFinance Dividends and Stock Splits fields",
+  "samples": [
+    {
+      "sample_id": "002594-split-2025-07-29",
+      "event_type": "split_bonus_transfer",
+      "instrument_id": "XSHE.002594",
+      "event_date": "2025-07-29",
+      "independent_split_ratio": 3.0,
+      "independent_cash_dividend": 1.32466,
+      "raw_close_before": 337.0,
+      "raw_close_after": 111.42,
+      "factor_before": 1.037805,
+      "factor_after": 3.150529,
+      "factor_latest": 3.162363
+    },
+    {
+      "sample_id": "600000-dividend-2025-07-16",
+      "event_type": "cash_dividend",
+      "instrument_id": "XSHG.600000",
+      "event_date": "2025-07-16",
+      "independent_cash_dividend": 0.41,
+      "raw_close_before": 13.93,
+      "raw_close_after": 13.48,
+      "factor_before": 12.38831,
+      "factor_after": 12.763991,
+      "factor_latest": 13.367013
+    },
+    {
+      "sample_id": "600519-no-action-2025-02-10-14",
+      "event_type": "no_corporate_action",
+      "instrument_id": "XSHG.600519",
+      "start_date": "2025-02-10",
+      "end_date": "2025-02-14",
+      "raw_close_before": 1431.51,
+      "raw_close_after": 1475.0,
+      "factor_before": 7.224927,
+      "factor_after": 7.224927,
+      "factor_latest": 7.669257
+    }
+  ]
+}

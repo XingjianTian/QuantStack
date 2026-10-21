@@ -1,0 +1,17 @@
+{
+  "schema_version": "quantstack.cn-session-daily.v1",
+  "repo_root": "${QUANT_STACK_ROOT}",
+  "python": "${QUANT_PYTHON}",
+  "work_root": "${QUANT_RUNTIME_ROOT}/daily-scheduler",
+  "session_parquet_root": "${QUANT_DATA_ROOT}/daily-session-parquet",
+  "calendar_raw": "${QUANT_STACK_ROOT}/config/cn_daily_calendar_2026_raw.json",
+  "calendar_normalized": "${QUANT_STACK_ROOT}/config/cn_daily_calendar_2026_normalized.json",
+  "calendar_raw_uri": "quant-data://evidence/calendar/cn-official-2026-v1-raw.json",
+  "calendar_normalized_uri": "quant-data://evidence/calendar/cn-official-2026-v1-normalized.json",
+  "calendar_source": "Shanghai Stock Exchange; Shenzhen Stock Exchange",
+  "calendar_version": "cn-official-2026-v1",
+  "environment_id": "quantstack-cn-session-daily",
+  "catch_up_start_date": "2026-08-07",
+  "batch_size": 500,
+  "min_batch_interval_seconds": 5
+}

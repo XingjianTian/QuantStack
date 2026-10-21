@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN" data-ark-theme="endfield" data-ark-depth="maximal">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10110f" />
+    <meta name="description" content="Personal quantitative research command center" />
+    <title>QuantStack量子栈</title>
+    <link rel="icon" type="image/svg+xml" href="/quant-center.svg" />
+    <script>
+      (() => {
+        const match = document.cookie.match(/(?:^|;\s*)quant-platform-theme=(dark|light)(?:;|$)/);
+        let theme = match?.[1];
+        if (!theme) {
+          try { theme = localStorage.getItem("quant-platform-theme"); } catch {}
+        }
+        if (theme !== "light" && theme !== "dark") theme = "dark";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "light" ? "#f2f2f0" : "#10110f");
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

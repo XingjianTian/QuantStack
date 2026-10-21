@@ -1,0 +1,32 @@
+{
+  "schema_version": "quantstack.cn-qfq-operations.v2",
+  "factor_policy": {
+    "event_signal": "baostock_preclose_vs_previous_raw_close",
+    "rotation_slices": 5,
+    "successful_empty_query_confirmations": 1,
+    "request_concurrency": 1,
+    "request_interval_milliseconds": 50,
+    "batch_size": 500,
+    "batch_interval_seconds": 5
+  },
+  "materialization_policy": {
+    "representation": "stable_numerator",
+    "daily_history_rewrite": false,
+    "daily_partition_scope": "one_closed_session"
+  },
+  "verification_policy": {
+    "daily": [
+      "first_import",
+      "receipt_and_artifact_readback",
+      "row_count",
+      "duplicate_key_check",
+      "watermark_check"
+    ],
+    "weekly": [
+      "one_idempotent_import_replay",
+      "five_rotation_slice_coverage",
+      "factor_ledger_continuity"
+    ],
+    "monthly_full_rebuild": false
+  }
+}

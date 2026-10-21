@@ -1,0 +1,53 @@
+schema_version: 1.0.0
+strategy_id: template_strategy
+name: Strategy Template
+version: 0.1.0
+owner: personal-quant-stack
+status: research
+thesis: Replace this text with a falsifiable market hypothesis.
+market_scope:
+  regions: [US]
+  asset_classes: [equity, etf]
+  venues: [NASDAQ, NYSE]
+  instruments: []
+  currency: USD
+data_requirements:
+  - dataset_id: us_equity_bars_1d
+    kind: market_bars
+    frequency: 1d
+    fields: [open, high, low, close, volume]
+    point_in_time: true
+signal_sources:
+  - Describe the source and decision timestamp of each signal.
+entry_rules:
+  - description: Define an entry rule.
+    expression: null
+    execution_timing: next_bar_open
+exit_rules:
+  - description: Define an exit rule.
+    expression: null
+    execution_timing: next_bar_open
+position_rules:
+  method: equal_weight
+  max_position_pct: 0.1
+  max_gross_exposure: 1.0
+  rebalance: monthly
+risk_limits:
+  max_drawdown_pct: 0.2
+  max_daily_loss_pct: 0.03
+  max_positions: 10
+  stop_loss_pct: null
+  kill_switch_required: true
+backtest:
+  engine: nautilus_trader
+  start: "2020-01-01"
+  end: "2025-12-31"
+  initial_capital: 100000
+  base_currency: USD
+  commission_bps: 2.0
+  slippage_bps: 5.0
+  benchmark: SPY
+implementation:
+  adapter: adapters.nautilus.spec_bridge
+  class: PendingStrategy
+tags: [template]

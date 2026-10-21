@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "capture_id": "cn-exchange-calendar-2026-window-raw-v1",
+  "fetched_at": "2026-08-04T00:00:00Z",
+  "data_rights": "public exchange notices; retained as a minimal factual extraction with source links",
+  "sources": [
+    {
+      "exchange": "XSHG",
+      "publisher": "Shanghai Stock Exchange",
+      "title": "2026 annual market closure arrangement",
+      "published_at": "2025-12-22",
+      "url": "https://www.sse.com.cn/disclosure/dealinstruc/closed/",
+      "extracted_fact": "Closed 2026-05-01 through 2026-05-05; normal trading resumes 2026-05-06; 2026-05-09 is a weekend closure."
+    },
+    {
+      "exchange": "XSHE",
+      "publisher": "Shenzhen Stock Exchange",
+      "title": "Notice on 2026 holiday market closures",
+      "published_at": "2025-12-22",
+      "url": "https://investor.szse.cn/disclosure/notice/general/t20251222_618087.html",
+      "extracted_fact": "Closed 2026-05-01 through 2026-05-05; normal trading resumes 2026-05-06; 2026-05-09 is a weekend closure."
+    },
+    {
+      "exchange": "BJSE",
+      "publisher": "Beijing Stock Exchange",
+      "title": "Announcement on 2026 holiday market closures",
+      "published_at": "2025-12-22",
+      "url": "https://www.bse.cn/important_news/200027428.html",
+      "extracted_fact": "Closed 2026-05-01 through 2026-05-05; normal trading resumes 2026-05-06; 2026-05-09 is a weekend closure."
+    }
+  ]
+}

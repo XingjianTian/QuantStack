@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/instrument/1.0.0",
+  "title": "QuantStack Instrument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["instrument_id", "symbol", "market", "asset_class", "venue", "currency", "timezone", "active"],
+  "properties": {
+    "instrument_id": {"type": "string", "minLength": 3}, "symbol": {"type": "string", "minLength": 1},
+    "market": {"enum": ["CN", "HK", "US"]}, "asset_class": {"enum": ["equity", "etf"]},
+    "venue": {"type": "string", "minLength": 1},
+    "provider_symbol": {"type": ["string", "null"]},
+    "provider_exchange_alias": {"type": ["string", "null"]},
+    "currency": {"enum": ["CNY", "HKD", "USD"]},
+    "name": {"type": ["string", "null"]}, "timezone": {"type": "string"}, "active": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/daily-r8-ledger/v1",
+  "title": "QuantStack Isolated R8 Ledger Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "candidate_id", "revision", "immutable", "entries"],
+  "properties": {
+    "schema_version": {"const": "quantstack.daily-r8-ledger.v1"},
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\.\\.?$)(?!.*[\\\\/]).+$"
+    },
+    "revision": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "immutable": {"const": true},
+    "entries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instrument_id", "state", "outcome", "reason"],
+        "properties": {
+          "instrument_id": {"type": "string", "minLength": 1},
+          "state": {"enum": ["R", "O", "P"]},
+          "outcome": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"state": {"const": "R"}}},
+            "then": {
+              "properties": {
+                "outcome": {"const": "returned"},
+                "reason": {"const": "bar_present"}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"state": {"const": "O"}}},
+            "then": {
+              "properties": {
+                "outcome": {"const": "no_bar"},
+                "reason": {"const": "explicit_no_bar_evidence"}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"state": {"const": "P"}}},
+            "then": {
+              "properties": {
+                "outcome": {
+                  "enum": ["provider_empty", "provider_error", "missing_outcome"]
+                },
+                "reason": {"const": "unresolved_provider_or_missing_outcome"}
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

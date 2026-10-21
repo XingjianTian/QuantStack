@@ -1,0 +1,278 @@
+--- a/src/components/Charts/CandlestickChart.jsx
++++ b/src/components/Charts/CandlestickChart.jsx
+@@ -50,6 +50,7 @@
+  * @param {Object} props.visibleRange - Optional visible time range to restore { from: timestamp, to: timestamp }
+  * @param {Function} props.onVisibleRangeChange - Callback when visible range changes
+  * @param {Function} props.onDataReady - Callback after the current symbol has price data
++ * @param {Function} props.onHistoryReady - Callback after shared predecessor history settles
+  * @param {Array|null} props.priceData - Optional static OHLCV payload to render without API calls
+  * @param {number|null} props.dataUpdatedAtOverride - Optional timestamp (ms) for static bundles
+  * @param {boolean} props.compact - When true, hides overlays (timeframe toggle, OHLC legend, updated-at indicator) for dense grid layouts
+@@ -63,6 +64,7 @@
+   visibleRange = null,
+   onVisibleRangeChange = null,
+   onDataReady = null,
++  onHistoryReady = null,
+   priceData = null,
+   rsLineData = null,
+   blueDots = null,
+@@ -230,6 +232,15 @@
+     }
+   }, [apiData, onDataReady, priceRequestSettled, symbol]);
+ 
++  useEffect(() => {
++    if (
++      onHistoryReady
++      && ['ready', 'exhausted', 'failed'].includes(historyState)
++    ) {
++      onHistoryReady(symbol, historyState);
++    }
++  }, [historyState, onHistoryReady, symbol]);
++
+   // Initialize chart on mount using useLayoutEffect for synchronous DOM access
+   useLayoutEffect(() => {
+     if (!chartContainerRef.current) {
+--- a/src/components/Charts/CandlestickChart.streaming.test.jsx
++++ b/src/components/Charts/CandlestickChart.streaming.test.jsx
+@@ -66,12 +66,12 @@
+   };
+ });
+ 
+-const renderChart = () => {
++const renderChart = (props = {}) => {
+   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+   return render(
+     <ThemeProvider theme={createTheme({ palette: { mode: 'dark' } })}>
+       <QueryClientProvider client={queryClient}>
+-        <CandlestickChart symbol="600000.SS" height={400} />
++        <CandlestickChart symbol="600000.SS" height={400} {...props} />
+       </QueryClientProvider>
+     </ThemeProvider>,
+   );
+@@ -145,6 +145,27 @@
+     ).toHaveAttribute('data-history-state', 'exhausted'));
+   });
+ 
++  it('reports deep-history readiness only after the predecessor request settles', async () => {
++    let resolveRange;
++    const onDataReady = vi.fn();
++    const onHistoryReady = vi.fn();
++    chartHarness.fetchRange.mockImplementation(() => new Promise((resolve) => {
++      resolveRange = resolve;
++    }));
++
++    renderChart({ onDataReady, onHistoryReady });
++    await waitFor(() => expect(onDataReady).toHaveBeenCalledWith('600000.SS'));
++    expect(onHistoryReady).not.toHaveBeenCalled();
++
++    resolveRange([
++      { date: '2025-01-02', open: 8, high: 10, low: 7, close: 9, volume: 80 },
++    ]);
++    await waitFor(() => expect(onHistoryReady).toHaveBeenCalledWith(
++      '600000.SS',
++      'exhausted',
++    ));
++  });
++
+   it('locks an exhausted shared history edge for non-daily timeframes', async () => {
+     chartHarness.fetchRange.mockResolvedValue([]);
+     renderChart();
+--- a/src/components/Scan/ChartViewerModal.jsx
++++ b/src/components/Scan/ChartViewerModal.jsx
+@@ -68,8 +68,8 @@
+   const [peerModalOpen, setPeerModalOpen] = useState(false);
+   const [setupDrawerOpen, setSetupDrawerOpen] = useState(false);
+   const [visibleRange, setVisibleRange] = useState(null); // Persist zoom across symbol navigation
+-  const [chartReadySymbol, setChartReadySymbol] = useState(null);
+-  const handleChartDataReady = useCallback((symbol) => setChartReadySymbol(symbol), []);
++  const [historyReadySymbol, setHistoryReadySymbol] = useState(null);
++  const handleChartHistoryReady = useCallback((symbol) => setHistoryReadySymbol(symbol), []);
+ 
+   // Build API params from filter state
+   const filterParams = useMemo(
+@@ -95,7 +95,7 @@
+   const { data: allSymbols, isLoading: symbolsLoading } = useQuery({
+     queryKey: ['allFilteredSymbols', scanId, filterCacheKey, sortBy, sortOrder],
+     queryFn: () => getAllFilteredSymbols(scanId, filterParams),
+-    enabled: open && !!scanId && !!chartReadySymbol && !Array.isArray(navigationSymbolsOverride),
++    enabled: open && !!scanId && !!historyReadySymbol && !Array.isArray(navigationSymbolsOverride),
+     staleTime: 5000, // 5 seconds — short enough to catch mid-session sort changes
+     refetchOnMount: 'always', // Always refetch when modal opens to pick up sort changes
+   });
+@@ -137,7 +137,7 @@
+   // the symbol, so an earlier A chart cannot authorize deferred work for a
+   // later A instance in an A -> B -> A cycle.
+   useLayoutEffect(() => {
+-    setChartReadySymbol(null);
++    setHistoryReadySymbol(null);
+   }, [open, currentSymbol]);
+ 
+   // Navigate to a specific symbol
+@@ -159,7 +159,7 @@
+   const { data: fetchedStockData } = useQuery({
+     queryKey: ['stockResult', scanId, currentSymbol],
+     queryFn: () => getSingleResult(scanId, currentSymbol),
+-    enabled: open && !!scanId && chartReadySymbol === currentSymbol && !stockData,
++    enabled: open && !!scanId && historyReadySymbol === currentSymbol && !stockData,
+     staleTime: 300000, // 5 minutes
+   });
+ 
+@@ -199,7 +199,7 @@
+   const { data: fundamentals } = useQuery({
+     queryKey: ['fundamentals', currentSymbol],
+     queryFn: () => getStockFundamentals(currentSymbol),
+-    enabled: open && chartReadySymbol === currentSymbol,
++    enabled: open && historyReadySymbol === currentSymbol,
+     staleTime: 300000, // 5 minutes (data is cached 7 days server-side)
+   });
+ 
+@@ -214,7 +214,7 @@
+   } = useQuery({
+     queryKey: ['groupRank', groupMarket, industryGroup],
+     queryFn: () => getGroupDetail(industryGroup, 1, groupMarket),
+-    enabled: open && chartReadySymbol === currentSymbol && !!industryGroup,
++    enabled: open && historyReadySymbol === currentSymbol && !!industryGroup,
+     staleTime: 300000, // 5 minutes
+     retry: false,
+   });
+@@ -266,13 +266,15 @@
+     setSetupDrawerOpen(false);
+   }, [currentSymbol]);
+ 
+-  // Prefetch the nearest adjacent stocks only after the current chart is ready.
++  // Prefetch the nearest adjacent stocks only after the current chart's shared
++  // predecessor history has settled. Keeping dashboard and adjacent reads out
++  // of this foreground window prevents cold NAS work from blocking history.
+   // Price history and fundamentals each fetch in a single batch; the
+   // remaining per-symbol calls are the lean single-row scan result and the
+   // group rank (derivable up front from current-page rows, and shared across
+   // symbols in the same group).
+   useEffect(() => {
+-    if (!open || !currentSymbol || chartReadySymbol !== currentSymbol || !navigationSymbols) return;
++    if (!open || !currentSymbol || historyReadySymbol !== currentSymbol || !navigationSymbols) return;
+     // CN qfq history is already local. Warming adjacent CN symbols competes
+     // with the next explicit chart click for the same NAS-backed read path.
+     // Keep adjacent prefetch for US, where it measurably improves navigation.
+@@ -317,7 +319,7 @@
+         retry: false,
+       });
+     });
+-  }, [open, currentSymbol, chartReadySymbol, currentIndex, navigationSymbols, queryClient, scanId, currentPageResults]);
++  }, [open, currentSymbol, historyReadySymbol, currentIndex, navigationSymbols, queryClient, scanId, currentPageResults]);
+ 
+   return (
+     <>
+@@ -564,7 +566,7 @@
+                     height="100%"
+                     visibleRange={visibleRange}
+                     onVisibleRangeChange={setVisibleRange}
+-                    onDataReady={handleChartDataReady}
++                    onHistoryReady={handleChartHistoryReady}
+                   />
+                 ) : (
+                   <Box
+--- a/src/components/Scan/ChartViewerModal.readiness.test.jsx
++++ b/src/components/Scan/ChartViewerModal.readiness.test.jsx
+@@ -22,17 +22,26 @@
+ }));
+ 
+ vi.mock('../Charts/CandlestickChart', () => {
+-  const MockCandlestickChart = ({ symbol, onDataReady }) => {
++  const MockCandlestickChart = ({ symbol, onDataReady, onHistoryReady }) => {
+     const [mountedFor] = useState(symbol);
+     return (
+-      <button
+-        type="button"
+-        aria-label={`ready-${symbol}`}
+-        data-mounted-for={mountedFor}
+-        onClick={() => onDataReady(symbol)}
+-      >
+-      ready-{symbol}
+-      </button>
++      <>
++        <button
++          type="button"
++          aria-label={`paint-ready-${symbol}`}
++          data-mounted-for={mountedFor}
++          onClick={() => onDataReady?.(symbol)}
++        >
++          paint-ready-{symbol}
++        </button>
++        <button
++          type="button"
++          aria-label={`history-ready-${symbol}`}
++          onClick={() => onHistoryReady(symbol, 'exhausted')}
++        >
++          history-ready-{symbol}
++        </button>
++      </>
+     );
+   };
+   return { default: MockCandlestickChart };
+@@ -84,7 +93,7 @@
+     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+     const view = renderModal(queryClient);
+ 
+-    fireEvent.click(screen.getByRole('button', { name: 'ready-AAA' }));
++    fireEvent.click(screen.getByRole('button', { name: 'history-ready-AAA' }));
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
+ 
+     view.rerender(
+@@ -113,7 +122,7 @@
+     );
+ 
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
+-    fireEvent.click(screen.getByRole('button', { name: 'ready-AAA' }));
++    fireEvent.click(screen.getByRole('button', { name: 'history-ready-AAA' }));
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(2);
+   });
+ 
+@@ -121,7 +130,7 @@
+     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+     const view = renderModal(queryClient);
+ 
+-    fireEvent.click(screen.getByRole('button', { name: 'ready-AAA' }));
++    fireEvent.click(screen.getByRole('button', { name: 'history-ready-AAA' }));
+     expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
+ 
+     currentSymbol = 'BBB';
+@@ -158,7 +167,7 @@
+     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+     const view = renderModal(queryClient);
+ 
+-    expect(screen.getByRole('button', { name: 'ready-AAA' }))
++    expect(screen.getByRole('button', { name: 'paint-ready-AAA' }))
+       .toHaveAttribute('data-mounted-for', 'AAA');
+ 
+     currentSymbol = 'BBB';
+@@ -175,7 +184,7 @@
+       </QueryClientProvider>
+     );
+ 
+-    expect(screen.getByRole('button', { name: 'ready-BBB' }))
++    expect(screen.getByRole('button', { name: 'paint-ready-BBB' }))
+       .toHaveAttribute('data-mounted-for', 'BBB');
+   });
+ 
+@@ -184,9 +193,20 @@
+     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+ 
+     renderModal(queryClient);
+-    fireEvent.click(screen.getByRole('button', { name: 'ready-600000.SS' }));
++    fireEvent.click(screen.getByRole('button', { name: 'history-ready-600000.SS' }));
+ 
+     expect(prefetchPriceHistoryBatch).not.toHaveBeenCalled();
+     expect(prefetchFundamentalsBatch).not.toHaveBeenCalled();
+   });
++
++  it('keeps dashboard work paused after first paint until predecessor history settles', () => {
++    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++
++    renderModal(queryClient);
++    fireEvent.click(screen.getByRole('button', { name: 'paint-ready-AAA' }));
++    expect(prefetchPriceHistoryBatch).not.toHaveBeenCalled();
++
++    fireEvent.click(screen.getByRole('button', { name: 'history-ready-AAA' }));
++    expect(prefetchPriceHistoryBatch).toHaveBeenCalledTimes(1);
++  });
+ });

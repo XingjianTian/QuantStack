@@ -1,0 +1,11 @@
+[Unit]
+Description=Promote completed A-share daily raw data through qfq and Stock Screener
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=0
+Unit=quantstack-cn-qfq-promotion.service
+
+[Install]
+WantedBy=timers.target

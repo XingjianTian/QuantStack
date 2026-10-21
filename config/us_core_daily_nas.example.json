@@ -1,0 +1,14 @@
+{
+  "_historical_notice": "Phase 2.14 Core archive/import example; not valid for current production cron. Use us_equity_daily_nas.example.json.",
+  "schema_version": "quantstack.us-core-daily-nas.v1",
+  "repo_root": "${QUANT_STACK_ROOT}",
+  "snapshot": "${QUANT_US_INSTRUMENT_SNAPSHOT}",
+  "state": "${QUANT_RUNTIME_ROOT}/us-core-daily-nas/state.json",
+  "initial_watermark": "2026-08-25",
+  "work_root": "${QUANT_RUNTIME_ROOT}/us-core-daily-nas",
+  "isolated_root": "${QUANT_DATA_ROOT}/us-equity-isolated",
+  "hmac_key_file": "${QUANT_RUNTIME_ROOT}/secrets/worker.key",
+  "yfinance_runtime_root": "${QUANT_RUNTIME_ROOT}/yfinance",
+  "yfinance_proxy_url": "${QUANT_YFINANCE_PROXY_URL}",
+  "verification_mode": "readback_only"
+}

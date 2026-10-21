@@ -1,0 +1,66 @@
+{
+  "fixture_kind": "offline_provider_replay",
+  "provider": "baostock",
+  "endpoint": "query_stock_basic",
+  "records": [
+    {
+      "instrument_id": "XSHG.600000",
+      "symbol": "600000",
+      "provider_symbol": "sh.600000",
+      "provider_exchange_alias": "sh",
+      "venue": "XSHG",
+      "name": "Pudong Development Bank",
+      "active": true
+    },
+    {
+      "instrument_id": "XSHE.000001",
+      "symbol": "000001",
+      "provider_symbol": "sz.000001",
+      "provider_exchange_alias": "sz",
+      "venue": "XSHE",
+      "name": "Ping An Bank",
+      "active": true
+    },
+    {
+      "instrument_id": "XSHG.688001",
+      "symbol": "688001",
+      "provider_symbol": "sh.688001",
+      "provider_exchange_alias": "sh",
+      "venue": "XSHG",
+      "name": "STAR Board Fixture",
+      "active": true,
+      "listed_from": "2019-07-22"
+    },
+    {
+      "instrument_id": "XSHE.300001",
+      "symbol": "300001",
+      "provider_symbol": "sz.300001",
+      "provider_exchange_alias": "sz",
+      "venue": "XSHE",
+      "name": "ChiNext Fixture",
+      "active": true,
+      "listed_from": "2009-10-30"
+    },
+    {
+      "instrument_id": "XSHG.600001",
+      "symbol": "600001",
+      "provider_symbol": "sh.600001",
+      "provider_exchange_alias": "sh",
+      "venue": "XSHG",
+      "name": "ST Suspension Fixture",
+      "active": true,
+      "listed_from": "1990-12-19"
+    },
+    {
+      "instrument_id": "XSHE.000003",
+      "symbol": "000003",
+      "provider_symbol": "sz.000003",
+      "provider_exchange_alias": "sz",
+      "venue": "XSHE",
+      "name": "Delisted Fixture",
+      "active": false,
+      "listed_from": "1991-01-14",
+      "listed_to": "2002-09-20"
+    }
+  ]
+}

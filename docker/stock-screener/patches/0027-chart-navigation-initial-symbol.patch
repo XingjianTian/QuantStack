@@ -1,0 +1,44 @@
+diff --git a/src/hooks/useChartNavigation.js b/src/hooks/useChartNavigation.js
+index 67be092..b81ec4a 100644
+--- a/src/hooks/useChartNavigation.js
++++ b/src/hooks/useChartNavigation.js
+@@ -13,7 +13,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
+  * @returns {Object} Navigation state and functions
+  */
+ export const useChartNavigation = (symbols, initialSymbol, isOpen) => {
+-  const [currentIndex, setCurrentIndex] = useState(0);
++  const [currentIndex, setCurrentIndex] = useState(() => {
++    const initialIndex = Array.isArray(symbols) ? symbols.indexOf(initialSymbol) : -1;
++    return initialIndex >= 0 ? initialIndex : 0;
++  });
+   const [currentSymbol, setCurrentSymbol] = useState(initialSymbol);
+ 
+   // Keep a ref to the latest symbols array so callbacks never use stale data
+diff --git a/src/hooks/useChartNavigation.test.jsx b/src/hooks/useChartNavigation.test.jsx
+new file mode 100644
+index 0000000..42fe011
+--- /dev/null
++++ b/src/hooks/useChartNavigation.test.jsx
+@@ -0,0 +1,22 @@
++import { render, waitFor } from '@testing-library/react';
++import { useChartNavigation } from './useChartNavigation';
++
++describe('useChartNavigation', () => {
++  it('never exposes the first row before a non-first initial symbol', async () => {
++    const observedSymbols = [];
++
++    function Probe() {
++      const navigation = useChartNavigation(
++        ['688368.SS', '688209.SS', '688300.SS'],
++        '688300.SS',
++        true
++      );
++      observedSymbols.push(navigation.currentSymbol);
++      return <span>{navigation.currentSymbol}</span>;
++    }
++
++    const view = render(<Probe />);
++    await waitFor(() => expect(view.getByText('688300.SS')).toBeInTheDocument());
++    expect(observedSymbols).not.toContain('688368.SS');
++  });
++});

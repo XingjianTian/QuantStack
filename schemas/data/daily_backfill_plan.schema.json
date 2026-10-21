@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/daily-backfill-plan/v1",
+  "title": "QuantStack Daily Backfill Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "planned_at",
+    "expires_at",
+    "planner_only",
+    "plan_revision",
+    "budget",
+    "items",
+    "deferred",
+    "excluded",
+    "estimated_http_requests"
+  ],
+  "properties": {
+    "schema_version": {"const": "quantstack.daily-backfill-plan.v1"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "planned_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "planner_only": {"const": true},
+    "plan_revision": {"type": "string", "minLength": 1},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_symbols", "max_symbol_sessions", "max_http_requests", "max_attempts_per_item"],
+      "properties": {
+        "max_symbols": {"type": "integer", "minimum": 1},
+        "max_symbol_sessions": {"type": "integer", "minimum": 1},
+        "max_http_requests": {"type": "integer", "minimum": 1},
+        "max_attempts_per_item": {"type": "integer", "minimum": 1}
+      }
+    },
+    "items": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Selected unresolved candidates. Idempotency keys are unique across items, deferred, and excluded by the planner contract.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "market",
+          "session",
+          "instrument_id",
+          "snapshot_id",
+          "dataset",
+          "price_basis",
+          "outcome",
+          "reason",
+          "priority",
+          "consecutive_unresolved",
+          "critical",
+          "attempts",
+          "attempt_no",
+          "estimated_http_requests",
+          "idempotency_key"
+        ],
+        "properties": {
+          "market": {"type": "string", "minLength": 1},
+          "session": {"type": "string", "format": "date"},
+          "instrument_id": {"type": "string", "minLength": 1},
+          "snapshot_id": {"type": "string", "minLength": 1},
+          "dataset": {"type": "string", "minLength": 1},
+          "price_basis": {"type": "string", "minLength": 1},
+          "outcome": {"enum": ["provider_empty", "provider_error"]},
+          "reason": {"type": "string", "minLength": 1},
+          "priority": {"type": "integer"},
+          "consecutive_unresolved": {"type": "integer", "minimum": 0},
+          "critical": {"type": "boolean"},
+          "attempts": {"type": "integer", "minimum": 0},
+          "attempt_no": {"type": "integer", "minimum": 1},
+          "estimated_http_requests": {"type": "integer", "minimum": 1},
+          "idempotency_key": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "deferred": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Budget-deferred candidates; each idempotency key has exactly one plan disposition.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotency_key", "reason"],
+        "properties": {
+          "idempotency_key": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Non-backfillable candidates; each idempotency key has exactly one plan disposition.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotency_key", "reason"],
+        "properties": {
+          "idempotency_key": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "estimated_http_requests": {"type": "integer", "minimum": 0}
+  }
+}

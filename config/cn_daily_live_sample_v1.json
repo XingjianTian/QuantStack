@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "universe_id": "cn-daily-live-sample",
+  "version": "2026-05-07.v1",
+  "instruments": [
+    {
+      "instrument_id": "XSHG.600000",
+      "symbol": "600000",
+      "market": "CN",
+      "asset_class": "equity",
+      "venue": "XSHG",
+      "provider_symbol": "sh.600000",
+      "provider_exchange_alias": "sh",
+      "currency": "CNY",
+      "name": "浦发银行",
+      "timezone": "Asia/Shanghai",
+      "active": true
+    },
+    {
+      "instrument_id": "XSHG.600519",
+      "symbol": "600519",
+      "market": "CN",
+      "asset_class": "equity",
+      "venue": "XSHG",
+      "provider_symbol": "sh.600519",
+      "provider_exchange_alias": "sh",
+      "currency": "CNY",
+      "name": "贵州茅台",
+      "timezone": "Asia/Shanghai",
+      "active": true
+    },
+    {
+      "instrument_id": "XSHE.000001",
+      "symbol": "000001",
+      "market": "CN",
+      "asset_class": "equity",
+      "venue": "XSHE",
+      "provider_symbol": "sz.000001",
+      "provider_exchange_alias": "sz",
+      "currency": "CNY",
+      "name": "平安银行",
+      "timezone": "Asia/Shanghai",
+      "active": true
+    }
+  ]
+}

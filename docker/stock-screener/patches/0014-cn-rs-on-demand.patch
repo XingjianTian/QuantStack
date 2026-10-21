@@ -1,0 +1,70 @@
+diff --git a/frontend/src/components/Charts/CandlestickChart.jsx b/frontend/src/components/Charts/CandlestickChart.jsx
+index 8fefca5a..26556b5b 100644
+--- a/frontend/src/components/Charts/CandlestickChart.jsx
++++ b/frontend/src/components/Charts/CandlestickChart.jsx
+@@ -11,6 +11,7 @@ import {
+   chartWheelIntent,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
++  defaultShowRsLine,
+   historyPeriodForTimeframe,
+   isDailyTimeframe,
+   mergePriceHistory,
+@@ -84,7 +85,7 @@ function CandlestickChart({
+   const historyExpansionPendingRef = useRef(false);
+ 
+   const [timeframe, setTimeframe] = useState('daily');
+-  const [showRSLine, setShowRSLine] = useState(true); // RS line overlay toggle
++  const [showRSLine, setShowRSLine] = useState(() => defaultShowRsLine(symbol)); // RS line overlay toggle
+   const [dailyHistoryPeriod, setDailyHistoryPeriod] = useState(period);
+   const [olderDailyData, setOlderDailyData] = useState([]);
+   const [legendData, setLegendData] = useState(null); // OHLC legend data on hover
+@@ -104,6 +105,10 @@ function CandlestickChart({
+     setOlderDailyData([]);
+   }, [period, symbol]);
+ 
++  useEffect(() => {
++    setShowRSLine(defaultShowRsLine(symbol));
++  }, [symbol]);
++
+   // Get any existing cached data for this symbol to use as placeholder
+   const getCachedData = () => {
+     return queryClient.getQueryData(priceHistoryKeys.symbol(symbol, historyPeriod));
+diff --git a/frontend/src/components/Charts/chartTimeframes.js b/frontend/src/components/Charts/chartTimeframes.js
+index 60db4dd9..edd699db 100644
+--- a/frontend/src/components/Charts/chartTimeframes.js
++++ b/frontend/src/components/Charts/chartTimeframes.js
+@@ -12,6 +12,8 @@ export const historyPeriodForTimeframe = (timeframe, fallback = '6mo') => (
+   ?? fallback
+ );
+ 
++export const defaultShowRsLine = (symbol) => !/\.(SS|SZ)$/i.test(symbol || '');
++
+ const DAILY_HISTORY_PERIODS = ['6mo', '2y', '5y', '10y'];
+ 
+ export const nextDailyHistoryPeriod = (period) => {
+diff --git a/frontend/src/components/Charts/chartTimeframes.test.js b/frontend/src/components/Charts/chartTimeframes.test.js
+index 44f95323..3b51b6cf 100644
+--- a/frontend/src/components/Charts/chartTimeframes.test.js
++++ b/frontend/src/components/Charts/chartTimeframes.test.js
+@@ -3,6 +3,7 @@ import {
+   chartWheelIntent,
+   chartZoomDirection,
+   clearRsOverlayForTimeframe,
++  defaultShowRsLine,
+   historyPeriodForTimeframe,
+   nextDailyHistoryPeriod,
+   isDailyTimeframe,
+@@ -60,6 +61,12 @@ describe('chart timeframe controls', () => {
+     expect(isDailyTimeframe('weekly')).toBe(false);
+   });
+ 
++  it('defers CN RS until requested while retaining the US default', () => {
++    expect(defaultShowRsLine('600000.SS')).toBe(false);
++    expect(defaultShowRsLine('000001.SZ')).toBe(false);
++    expect(defaultShowRsLine('AAPL')).toBe(true);
++  });
++
+   it('uses bundled data only for the fast five-day and daily views', () => {
+     const bundled = [{ date: '2026-08-31', close: 10 }];
+ 

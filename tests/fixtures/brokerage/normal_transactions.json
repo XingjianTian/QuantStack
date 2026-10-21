@@ -1,0 +1,30 @@
+[
+  {
+    "transactionId": "SAMPLE-TRANSACTION-001",
+    "activityId": "SAMPLE-ACTIVITY-001",
+    "type": "TRADE",
+    "transactionSubType": "BUY",
+    "transactionDate": "2026-10-16T00:00:00+00:00",
+    "tradeDate": "2026-10-16T00:00:00+00:00",
+    "netAmount": "-70.00",
+    "orderId": "SAMPLE-ORDER-001",
+    "transferItems": [
+      {
+        "amount": "2",
+        "price": "35.00",
+        "instrument": {
+          "assetType": "EQUITY",
+          "symbol": "QXEN",
+          "currency": "USD"
+        }
+      }
+    ]
+  },
+  {
+    "transactionId": "SAMPLE-CASH-001",
+    "activityId": "SAMPLE-CASH-ACTIVITY-001",
+    "type": "CASH_RECEIPT",
+    "transactionDate": "2026-10-14T00:00:00+00:00",
+    "netAmount": "100.00"
+  }
+]

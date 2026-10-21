@@ -1,0 +1,1246 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-16T00:00:00Z",
+  "sampleTime": "2026-10-16T00:00:00Z",
+  "staleTime": "2026-10-16T01:00:00Z",
+  "fictional": true,
+  "nonExecutable": true,
+  "ready": {
+    "snapshot": {
+      "snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+      "account": {
+        "account_id": "fictional-account",
+        "alias": "Fictional Ready Margin Sample",
+        "account_type": "margin",
+        "base_currency": "USD",
+        "balances": [
+          {
+            "currency": "USD",
+            "balance": "1000.00",
+            "cash": "500.00",
+            "settled_cash": "450.00",
+            "available_cash": "490.00",
+            "buying_power": "980.00",
+            "withdrawable_cash": "400.00",
+            "open_order_reservation": "0.00",
+            "order_reservation_included": true,
+            "margin_enabled": true,
+            "source_fields": [
+              "buyingPower",
+              "cashAvailableForTrading",
+              "cashAvailableForWithdrawal",
+              "cashBalance",
+              "liquidationValue",
+              "orderReservationIncluded",
+              "pendingOrders",
+              "settledCash"
+            ],
+            "unknown_fields": []
+          }
+        ],
+        "source_account_type": "MARGIN",
+        "unknown_fields": []
+      },
+      "positions": [
+        {
+          "position_id": "SAMPLE-POS-OPTION",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "XYZ  261016C00200000",
+            "asset_type": "option",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": {
+              "underlying_symbol": "XYZ",
+              "expiration_date": "2026-10-16",
+              "put_call": "CALL",
+              "strike_price": "200.00",
+              "contract_multiplier": "100",
+              "deliverable": "100 shares of XYZ",
+              "contract_symbol": "XYZ  261016C00200000",
+              "unknown_fields": []
+            },
+            "unknown_fields": []
+          },
+          "quantity": "1",
+          "side": "long",
+          "average_price": {
+            "currency": "USD",
+            "amount": "2.00"
+          },
+          "market_value": {
+            "currency": "USD",
+            "amount": "200.00"
+          },
+          "cost_basis": {
+            "currency": "USD",
+            "amount": "200.00"
+          },
+          "as_of": "2026-10-16T00:00:00Z",
+          "source_position_id": "SAMPLE-POS-OPTION",
+          "unknown_fields": []
+        },
+        {
+          "position_id": "SAMPLE-POS-QXEN",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": "Fictional Utility Equity",
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "quantity": "1.5",
+          "side": "long",
+          "average_price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "market_value": {
+            "currency": "USD",
+            "amount": "52.50"
+          },
+          "cost_basis": {
+            "currency": "USD",
+            "amount": "52.50"
+          },
+          "as_of": "2026-10-16T00:00:00Z",
+          "source_position_id": "SAMPLE-POS-QXEN",
+          "unknown_fields": []
+        }
+      ],
+      "orders": [
+        {
+          "order_id": "SAMPLE-ORDER-001",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "side": "buy",
+          "order_type": "LIMIT",
+          "status": "canceled",
+          "raw_status": "CANCELED",
+          "requested_quantity": "5",
+          "filled_quantity": "2",
+          "remaining_quantity": "0",
+          "limit_price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "entered_at": "2026-10-16T00:00:00Z",
+          "updated_at": "2026-10-16T00:00:00Z",
+          "replaces_order_id": null,
+          "replaced_by_order_id": null,
+          "child_order_ids": [],
+          "is_open": false,
+          "unknown_fields": []
+        },
+        {
+          "order_id": "SAMPLE-ORDER-002",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "XYZ  261016C00200000",
+            "asset_type": "option",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": {
+              "underlying_symbol": "XYZ",
+              "expiration_date": "2026-10-16",
+              "put_call": "CALL",
+              "strike_price": "200.00",
+              "contract_multiplier": "100",
+              "deliverable": "100 shares of XYZ",
+              "contract_symbol": "XYZ  261016C00200000",
+              "unknown_fields": []
+            },
+            "unknown_fields": []
+          },
+          "side": "buy",
+          "order_type": "LIMIT",
+          "status": "canceled",
+          "raw_status": "CANCELED",
+          "requested_quantity": "1",
+          "filled_quantity": "0",
+          "remaining_quantity": "0",
+          "limit_price": {
+            "currency": "USD",
+            "amount": "2.00"
+          },
+          "entered_at": "2026-10-15T00:00:00Z",
+          "updated_at": "2026-10-15T00:00:00Z",
+          "replaces_order_id": null,
+          "replaced_by_order_id": null,
+          "child_order_ids": [],
+          "is_open": false,
+          "unknown_fields": []
+        }
+      ],
+      "transactions": [
+        {
+          "transaction_id": "SAMPLE-CASH-001",
+          "account_id": "fictional-account",
+          "transaction_type": "cash_receipt",
+          "transaction_subtype": null,
+          "instrument": null,
+          "quantity": null,
+          "price": null,
+          "net_amount": {
+            "currency": "USD",
+            "amount": "100.00"
+          },
+          "transaction_time": "2026-10-14T00:00:00Z",
+          "order_id": null,
+          "related_transaction_id": null,
+          "attribution_status": "unattributed",
+          "unknown_fields": []
+        },
+        {
+          "transaction_id": "SAMPLE-TRANSACTION-001",
+          "account_id": "fictional-account",
+          "transaction_type": "trade",
+          "transaction_subtype": "BUY",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "quantity": "2",
+          "price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "net_amount": {
+            "currency": "USD",
+            "amount": "-70.00"
+          },
+          "transaction_time": "2026-10-16T00:00:00Z",
+          "order_id": "SAMPLE-ORDER-001",
+          "related_transaction_id": null,
+          "attribution_status": "unattributed",
+          "unknown_fields": []
+        }
+      ],
+      "fills": [
+        {
+          "execution_id": "SAMPLE-TRANSACTION-001:execution",
+          "account_id": "fictional-account",
+          "order_id": "SAMPLE-ORDER-001",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "side": "buy",
+          "quantity": "2",
+          "price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "amount": {
+            "currency": "USD",
+            "amount": "-70.00"
+          },
+          "fee": null,
+          "executed_at": "2026-10-16T00:00:00Z",
+          "attribution_status": "unattributed",
+          "source_transaction_id": "SAMPLE-TRANSACTION-001",
+          "unknown_fields": []
+        }
+      ],
+      "quotes": [
+        {
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": "Fictional Utility Equity",
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "bid": {
+            "currency": "USD",
+            "amount": "34.90"
+          },
+          "ask": {
+            "currency": "USD",
+            "amount": "35.10"
+          },
+          "last": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "quote_time": "2026-10-16T00:00:00Z",
+          "stale_after_seconds": 900,
+          "is_stale": false,
+          "unknown_fields": []
+        },
+        {
+          "instrument": {
+            "symbol": "XYZ  261016C00200000",
+            "asset_type": "option",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": {
+              "underlying_symbol": "XYZ",
+              "expiration_date": "2026-10-16",
+              "put_call": "CALL",
+              "strike_price": "200.00",
+              "contract_multiplier": "100",
+              "deliverable": "100 shares of XYZ",
+              "contract_symbol": "XYZ  261016C00200000",
+              "unknown_fields": []
+            },
+            "unknown_fields": []
+          },
+          "bid": {
+            "currency": "USD",
+            "amount": "1.00"
+          },
+          "ask": {
+            "currency": "USD",
+            "amount": "2.00"
+          },
+          "last": {
+            "currency": "USD",
+            "amount": "1.50"
+          },
+          "quote_time": "2026-10-16T00:00:00Z",
+          "stale_after_seconds": 900,
+          "is_stale": false,
+          "unknown_fields": []
+        }
+      ],
+      "business_time": "2026-10-16T00:00:00Z",
+      "received_at": "2026-10-16T00:00:00Z",
+      "sync_batch_id": "45eca1f94924ecba9bfd059d068e9dd692cfb9f3e45c11ea2e80caa8e7b01f34",
+      "mapping_version": "schwab-py-1.5.1-readonly-v1",
+      "coverage": {
+        "sections": [
+          "account",
+          "positions",
+          "orders",
+          "transactions",
+          "fills",
+          "quotes"
+        ],
+        "start": "2026-08-17T00:00:00Z",
+        "end": "2026-10-16T00:00:00Z",
+        "complete": true,
+        "truncated": false,
+        "next_cursor": null,
+        "source_as_of": "2026-10-16T00:00:00Z"
+      },
+      "cursor": null,
+      "complete": true,
+      "conflicts": [],
+      "non_executable": true
+    },
+    "sync": {
+      "attempt": {
+        "account_id": "fictional-account",
+        "batch_id": "45eca1f94924ecba9bfd059d068e9dd692cfb9f3e45c11ea2e80caa8e7b01f34",
+        "error_code": null,
+        "error_message": null,
+        "failure_sections": [],
+        "finished_at": "2026-10-16T00:00:00Z",
+        "started_at": "2026-10-16T00:00:00Z",
+        "status": "succeeded"
+      },
+      "proposal_blocked": false,
+      "published": true,
+      "snapshot": {
+        "account_id": "fictional-account",
+        "alias": "Fictional Ready Margin Sample",
+        "business_time": "2026-10-16T00:00:00+00:00",
+        "complete": true,
+        "conflicts": [],
+        "non_executable": true,
+        "orders": 2,
+        "positions": 2,
+        "quotes": 2,
+        "snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+        "transactions": 2
+      },
+      "state": {
+        "account_id": "fictional-account",
+        "complete": true,
+        "cursor": null,
+        "last_attempt_at": "2026-10-16T00:00:00Z",
+        "last_attempt_status": "succeeded",
+        "last_error_code": null,
+        "last_error_message": null,
+        "last_failure_sections": [],
+        "last_success_at": "2026-10-16T00:00:00Z",
+        "last_success_snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+        "pending_fact_ids": []
+      }
+    },
+    "proposal": {
+      "account_id": "fictional-account",
+      "available_cash": "490.00",
+      "batch_id": "proposal:cf1faa1ba3950c1c60c9c9fec56b0552d5af43d9609c4bd830cb819e18eec7c5",
+      "blocking_reasons": [],
+      "cash_currency": "USD",
+      "fictional": true,
+      "generated_at": "2026-10-16T00:00:00Z",
+      "input_fingerprint": "cf1faa1ba3950c1c60c9c9fec56b0552d5af43d9609c4bd830cb819e18eec7c5",
+      "items": [
+        {
+          "assumed_limit_price": "35.10",
+          "cash_reserve": "10.00",
+          "currency": "USD",
+          "data_references": [
+            "snapshot:44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+            "plan:1",
+            "quote:QXEN:2026-10-16T00:00:00+00:00"
+          ],
+          "estimated_fee": "1.00",
+          "gross_amount": "175.50",
+          "item_id": "item:fictional-equity-layer-1",
+          "layer_id": "fictional-equity-layer-1",
+          "maximum_cash_use": "186.50",
+          "non_executable": true,
+          "plan_id": "fictional-equity-layer-1",
+          "quantity": "5",
+          "quote_time": "2026-10-16T00:00:00Z",
+          "reasons": [],
+          "remaining_budget": "23.50",
+          "side": "buy",
+          "source": "equity:fictional-equity-layer-1",
+          "spent_budget": "0",
+          "status": "waiting_review",
+          "strategy_budget": "200.00",
+          "symbol": "QXEN",
+          "trigger_price": "36.00"
+        },
+        {
+          "assumed_limit_price": "35.10",
+          "cash_reserve": "10.00",
+          "currency": "USD",
+          "data_references": [
+            "snapshot:44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+            "plan:1",
+            "quote:QXEN:2026-10-16T00:00:00+00:00"
+          ],
+          "estimated_fee": "1.00",
+          "gross_amount": "105.30",
+          "item_id": "item:fictional-etf-plan",
+          "layer_id": null,
+          "maximum_cash_use": "116.30",
+          "non_executable": true,
+          "plan_id": "fictional-etf-plan",
+          "quantity": "3",
+          "quote_time": "2026-10-16T00:00:00Z",
+          "reasons": [],
+          "remaining_budget": "823.70",
+          "side": "buy",
+          "source": "etf:fictional-etf-plan",
+          "spent_budget": "70.00",
+          "status": "ready",
+          "strategy_budget": "1000.00",
+          "symbol": "QXEN",
+          "trigger_price": null
+        }
+      ],
+      "ledger_version": "2648bb7197f49300b6225250884add52c2d3746a0fb921d70c28b68ed5f1e60a",
+      "non_executable": true,
+      "open_order_occupation": "0",
+      "plan_fingerprint": "cafa0bd2a0c249c09793c8c8caf3dc7d92de2af5f4312042aa169757e6c3d93e",
+      "plan_version": 1,
+      "replaced_batch_id": null,
+      "review_status": "pending",
+      "reviewed_at": null,
+      "reviewed_by": null,
+      "reviewed_input_fingerprint": null,
+      "snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+      "status": "ready",
+      "sync_failure_generation": 0
+    },
+    "state": {
+      "as_of": "2026-10-16T00:00:00+00:00",
+      "current_proposal": {
+        "account_id": "fictional-account",
+        "available_cash": "490.00",
+        "batch_id": "proposal:cf1faa1ba3950c1c60c9c9fec56b0552d5af43d9609c4bd830cb819e18eec7c5",
+        "blocking_reasons": [],
+        "cash_currency": "USD",
+        "fictional": true,
+        "generated_at": "2026-10-16T00:00:00Z",
+        "input_fingerprint": "cf1faa1ba3950c1c60c9c9fec56b0552d5af43d9609c4bd830cb819e18eec7c5",
+        "items": [
+          {
+            "assumed_limit_price": "35.10",
+            "cash_reserve": "10.00",
+            "currency": "USD",
+            "data_references": [
+              "snapshot:44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+              "plan:1",
+              "quote:QXEN:2026-10-16T00:00:00+00:00"
+            ],
+            "estimated_fee": "1.00",
+            "gross_amount": "175.50",
+            "item_id": "item:fictional-equity-layer-1",
+            "layer_id": "fictional-equity-layer-1",
+            "maximum_cash_use": "186.50",
+            "non_executable": true,
+            "plan_id": "fictional-equity-layer-1",
+            "quantity": "5",
+            "quote_time": "2026-10-16T00:00:00Z",
+            "reasons": [],
+            "remaining_budget": "23.50",
+            "side": "buy",
+            "source": "equity:fictional-equity-layer-1",
+            "spent_budget": "0",
+            "status": "waiting_review",
+            "strategy_budget": "200.00",
+            "symbol": "QXEN",
+            "trigger_price": "36.00"
+          },
+          {
+            "assumed_limit_price": "35.10",
+            "cash_reserve": "10.00",
+            "currency": "USD",
+            "data_references": [
+              "snapshot:44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+              "plan:1",
+              "quote:QXEN:2026-10-16T00:00:00+00:00"
+            ],
+            "estimated_fee": "1.00",
+            "gross_amount": "105.30",
+            "item_id": "item:fictional-etf-plan",
+            "layer_id": null,
+            "maximum_cash_use": "116.30",
+            "non_executable": true,
+            "plan_id": "fictional-etf-plan",
+            "quantity": "3",
+            "quote_time": "2026-10-16T00:00:00Z",
+            "reasons": [],
+            "remaining_budget": "823.70",
+            "side": "buy",
+            "source": "etf:fictional-etf-plan",
+            "spent_budget": "70.00",
+            "status": "ready",
+            "strategy_budget": "1000.00",
+            "symbol": "QXEN",
+            "trigger_price": null
+          }
+        ],
+        "ledger_version": "2648bb7197f49300b6225250884add52c2d3746a0fb921d70c28b68ed5f1e60a",
+        "non_executable": true,
+        "open_order_occupation": "0",
+        "plan_fingerprint": "cafa0bd2a0c249c09793c8c8caf3dc7d92de2af5f4312042aa169757e6c3d93e",
+        "plan_version": 1,
+        "replaced_batch_id": null,
+        "review_status": "pending",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "reviewed_input_fingerprint": null,
+        "snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+        "status": "ready",
+        "sync_failure_generation": 0
+      },
+      "current_proposal_state": "current",
+      "ledger_version": "2648bb7197f49300b6225250884add52c2d3746a0fb921d70c28b68ed5f1e60a",
+      "non_executable": true,
+      "proposal_freshness_reasons": [],
+      "snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+      "stale_proposal_batch_id": null,
+      "state": {
+        "account_id": "fictional-account",
+        "complete": true,
+        "cursor": null,
+        "last_attempt_at": "2026-10-16T00:00:00Z",
+        "last_attempt_status": "succeeded",
+        "last_error_code": null,
+        "last_error_message": null,
+        "last_failure_sections": [],
+        "last_success_at": "2026-10-16T00:00:00Z",
+        "last_success_snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+        "pending_fact_ids": []
+      }
+    },
+    "staleState": {
+      "as_of": "2026-10-16T01:00:00+00:00",
+      "current_proposal": null,
+      "current_proposal_state": "stale",
+      "ledger_version": "2648bb7197f49300b6225250884add52c2d3746a0fb921d70c28b68ed5f1e60a",
+      "non_executable": true,
+      "proposal_freshness_reasons": [
+        "QUOTE_STALE:QXEN"
+      ],
+      "snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+      "stale_proposal_batch_id": "proposal:cf1faa1ba3950c1c60c9c9fec56b0552d5af43d9609c4bd830cb819e18eec7c5",
+      "state": {
+        "account_id": "fictional-account",
+        "complete": true,
+        "cursor": null,
+        "last_attempt_at": "2026-10-16T00:00:00Z",
+        "last_attempt_status": "succeeded",
+        "last_error_code": null,
+        "last_error_message": null,
+        "last_failure_sections": [],
+        "last_success_at": "2026-10-16T00:00:00Z",
+        "last_success_snapshot_id": "44ae0dd7415bc142aa742aa7d323e8fa7a46065ac2d91d14034168f0fa387c80",
+        "pending_fact_ids": []
+      }
+    }
+  },
+  "blocked": {
+    "snapshot": {
+      "snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+      "account": {
+        "account_id": "fictional-account",
+        "alias": "Fictional Margin Sample",
+        "account_type": "margin",
+        "base_currency": "USD",
+        "balances": [
+          {
+            "currency": "USD",
+            "balance": "1000.00",
+            "cash": "500.00",
+            "settled_cash": "450.00",
+            "available_cash": "490.00",
+            "buying_power": "980.00",
+            "withdrawable_cash": "400.00",
+            "open_order_reservation": null,
+            "order_reservation_included": null,
+            "margin_enabled": true,
+            "source_fields": [
+              "buyingPower",
+              "cashAvailableForTrading",
+              "cashAvailableForWithdrawal",
+              "cashBalance",
+              "liquidationValue",
+              "settledCash"
+            ],
+            "unknown_fields": []
+          }
+        ],
+        "source_account_type": "MARGIN",
+        "unknown_fields": []
+      },
+      "positions": [
+        {
+          "position_id": "SAMPLE-POS-OPTION",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "XYZ  261016C00200000",
+            "asset_type": "option",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": {
+              "underlying_symbol": "XYZ",
+              "expiration_date": "2026-10-16",
+              "put_call": "CALL",
+              "strike_price": "200.00",
+              "contract_multiplier": null,
+              "deliverable": null,
+              "contract_symbol": "XYZ  261016C00200000",
+              "unknown_fields": [
+                "contractMultiplier",
+                "deliverable"
+              ]
+            },
+            "unknown_fields": []
+          },
+          "quantity": "1",
+          "side": "long",
+          "average_price": {
+            "currency": "USD",
+            "amount": "2.00"
+          },
+          "market_value": {
+            "currency": "USD",
+            "amount": "200.00"
+          },
+          "cost_basis": {
+            "currency": "USD",
+            "amount": "200.00"
+          },
+          "as_of": "2026-10-16T00:00:00Z",
+          "source_position_id": "SAMPLE-POS-OPTION",
+          "unknown_fields": []
+        },
+        {
+          "position_id": "SAMPLE-POS-QXEN",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": "Fictional Utility Equity",
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "quantity": "1.5",
+          "side": "long",
+          "average_price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "market_value": {
+            "currency": "USD",
+            "amount": "52.50"
+          },
+          "cost_basis": {
+            "currency": "USD",
+            "amount": "52.50"
+          },
+          "as_of": "2026-10-16T00:00:00Z",
+          "source_position_id": "SAMPLE-POS-QXEN",
+          "unknown_fields": []
+        }
+      ],
+      "orders": [
+        {
+          "order_id": "SAMPLE-ORDER-001",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "side": "buy",
+          "order_type": "LIMIT",
+          "status": "partially_filled",
+          "raw_status": "PARTIALLY_FILLED",
+          "requested_quantity": "5",
+          "filled_quantity": "2",
+          "remaining_quantity": "3",
+          "limit_price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "entered_at": "2026-10-16T00:00:00Z",
+          "updated_at": "2026-10-16T00:00:00Z",
+          "replaces_order_id": null,
+          "replaced_by_order_id": null,
+          "child_order_ids": [],
+          "is_open": true,
+          "unknown_fields": []
+        },
+        {
+          "order_id": "SAMPLE-ORDER-002",
+          "account_id": "fictional-account",
+          "instrument": {
+            "symbol": "XYZ  261016C00200000",
+            "asset_type": "option",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": {
+              "underlying_symbol": "<unknown>",
+              "expiration_date": null,
+              "put_call": null,
+              "strike_price": null,
+              "contract_multiplier": null,
+              "deliverable": null,
+              "contract_symbol": "XYZ  261016C00200000",
+              "unknown_fields": [
+                "contractMultiplier",
+                "deliverable",
+                "underlyingSymbol"
+              ]
+            },
+            "unknown_fields": []
+          },
+          "side": "buy",
+          "order_type": "LIMIT",
+          "status": "canceled",
+          "raw_status": "CANCELED",
+          "requested_quantity": "1",
+          "filled_quantity": "0",
+          "remaining_quantity": "1",
+          "limit_price": {
+            "currency": "USD",
+            "amount": "2.00"
+          },
+          "entered_at": "2026-10-15T00:00:00Z",
+          "updated_at": "2026-10-15T00:00:00Z",
+          "replaces_order_id": null,
+          "replaced_by_order_id": null,
+          "child_order_ids": [],
+          "is_open": false,
+          "unknown_fields": []
+        }
+      ],
+      "transactions": [
+        {
+          "transaction_id": "SAMPLE-CASH-001",
+          "account_id": "fictional-account",
+          "transaction_type": "cash_receipt",
+          "transaction_subtype": null,
+          "instrument": null,
+          "quantity": null,
+          "price": null,
+          "net_amount": {
+            "currency": "USD",
+            "amount": "100.00"
+          },
+          "transaction_time": "2026-10-14T00:00:00Z",
+          "order_id": null,
+          "related_transaction_id": null,
+          "attribution_status": "unattributed",
+          "unknown_fields": []
+        },
+        {
+          "transaction_id": "SAMPLE-TRANSACTION-001",
+          "account_id": "fictional-account",
+          "transaction_type": "trade",
+          "transaction_subtype": "BUY",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "quantity": "2",
+          "price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "net_amount": {
+            "currency": "USD",
+            "amount": "-70.00"
+          },
+          "transaction_time": "2026-10-16T00:00:00Z",
+          "order_id": "SAMPLE-ORDER-001",
+          "related_transaction_id": null,
+          "attribution_status": "unattributed",
+          "unknown_fields": []
+        }
+      ],
+      "fills": [
+        {
+          "execution_id": "SAMPLE-TRANSACTION-001:execution",
+          "account_id": "fictional-account",
+          "order_id": "SAMPLE-ORDER-001",
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "side": "buy",
+          "quantity": "2",
+          "price": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "amount": {
+            "currency": "USD",
+            "amount": "-70.00"
+          },
+          "fee": null,
+          "executed_at": "2026-10-16T00:00:00Z",
+          "attribution_status": "unattributed",
+          "source_transaction_id": "SAMPLE-TRANSACTION-001",
+          "unknown_fields": []
+        }
+      ],
+      "quotes": [
+        {
+          "instrument": {
+            "symbol": "QXEN",
+            "asset_type": "equity",
+            "description": "Fictional Utility Equity",
+            "currency": "USD",
+            "cusip": null,
+            "option": null,
+            "unknown_fields": []
+          },
+          "bid": {
+            "currency": "USD",
+            "amount": "34.90"
+          },
+          "ask": {
+            "currency": "USD",
+            "amount": "35.10"
+          },
+          "last": {
+            "currency": "USD",
+            "amount": "35.00"
+          },
+          "quote_time": "2026-10-16T00:00:00Z",
+          "stale_after_seconds": 900,
+          "is_stale": false,
+          "unknown_fields": []
+        },
+        {
+          "instrument": {
+            "symbol": "XYZ  261016C00200000",
+            "asset_type": "option",
+            "description": null,
+            "currency": "USD",
+            "cusip": null,
+            "option": {
+              "underlying_symbol": "XYZ",
+              "expiration_date": null,
+              "put_call": null,
+              "strike_price": null,
+              "contract_multiplier": null,
+              "deliverable": null,
+              "contract_symbol": "XYZ  261016C00200000",
+              "unknown_fields": [
+                "contractMultiplier",
+                "deliverable"
+              ]
+            },
+            "unknown_fields": []
+          },
+          "bid": {
+            "currency": "USD",
+            "amount": "1.00"
+          },
+          "ask": {
+            "currency": "USD",
+            "amount": "2.00"
+          },
+          "last": {
+            "currency": "USD",
+            "amount": "1.50"
+          },
+          "quote_time": "2026-10-16T00:00:00Z",
+          "stale_after_seconds": 900,
+          "is_stale": false,
+          "unknown_fields": []
+        }
+      ],
+      "business_time": "2026-10-16T00:00:00Z",
+      "received_at": "2026-10-16T00:00:00Z",
+      "sync_batch_id": "905d43558bf362fcb536b242b8a4312f2f6c24f24efc832e784723ac7fd2b2aa",
+      "mapping_version": "schwab-py-1.5.1-readonly-v1",
+      "coverage": {
+        "sections": [
+          "account",
+          "positions",
+          "orders",
+          "transactions",
+          "fills",
+          "quotes"
+        ],
+        "start": "2026-08-17T00:00:00Z",
+        "end": "2026-10-16T00:00:00Z",
+        "complete": true,
+        "truncated": false,
+        "next_cursor": null,
+        "source_as_of": "2026-10-16T00:00:00Z"
+      },
+      "cursor": null,
+      "complete": true,
+      "conflicts": [],
+      "non_executable": true
+    },
+    "sync": {
+      "attempt": {
+        "account_id": "fictional-account",
+        "batch_id": "905d43558bf362fcb536b242b8a4312f2f6c24f24efc832e784723ac7fd2b2aa",
+        "error_code": null,
+        "error_message": null,
+        "failure_sections": [],
+        "finished_at": "2026-10-16T00:00:00Z",
+        "started_at": "2026-10-16T00:00:00Z",
+        "status": "succeeded"
+      },
+      "proposal_blocked": false,
+      "published": true,
+      "snapshot": {
+        "account_id": "fictional-account",
+        "alias": "Fictional Margin Sample",
+        "business_time": "2026-10-16T00:00:00+00:00",
+        "complete": true,
+        "conflicts": [],
+        "non_executable": true,
+        "orders": 2,
+        "positions": 2,
+        "quotes": 2,
+        "snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+        "transactions": 2
+      },
+      "state": {
+        "account_id": "fictional-account",
+        "complete": true,
+        "cursor": null,
+        "last_attempt_at": "2026-10-16T00:00:00Z",
+        "last_attempt_status": "succeeded",
+        "last_error_code": null,
+        "last_error_message": null,
+        "last_failure_sections": [],
+        "last_success_at": "2026-10-16T00:00:00Z",
+        "last_success_snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+        "pending_fact_ids": []
+      }
+    },
+    "proposal": {
+      "account_id": "fictional-account",
+      "available_cash": "490.00",
+      "batch_id": "proposal:90406868770e5c90d373d8103fdd377bc5e5307ecaeab26556507cb35e8b6354",
+      "blocking_reasons": [
+        "UNKNOWN_RESERVATION_SEMANTICS",
+        "TERMINAL_ORDER_REMAINDER:SAMPLE-ORDER-002",
+        "UNKNOWN_ORDER_RESERVATION_SEMANTICS",
+        "UNKNOWN_OPTION_OBLIGATION"
+      ],
+      "cash_currency": "USD",
+      "fictional": true,
+      "generated_at": "2026-10-16T00:00:00Z",
+      "input_fingerprint": "90406868770e5c90d373d8103fdd377bc5e5307ecaeab26556507cb35e8b6354",
+      "items": [
+        {
+          "assumed_limit_price": "35.10",
+          "cash_reserve": "0",
+          "currency": "USD",
+          "data_references": [
+            "snapshot:04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+            "plan:1",
+            "quote:QXEN:2026-10-16T00:00:00+00:00"
+          ],
+          "estimated_fee": "0",
+          "gross_amount": "0.00",
+          "item_id": "item:fictional-equity-layer-1",
+          "layer_id": "fictional-equity-layer-1",
+          "maximum_cash_use": "0.00",
+          "non_executable": true,
+          "plan_id": "fictional-equity-layer-1",
+          "quantity": "0",
+          "quote_time": "2026-10-16T00:00:00Z",
+          "reasons": [
+            "UNKNOWN_RESERVATION_SEMANTICS",
+            "TERMINAL_ORDER_REMAINDER:SAMPLE-ORDER-002",
+            "UNKNOWN_ORDER_RESERVATION_SEMANTICS",
+            "UNKNOWN_OPTION_OBLIGATION"
+          ],
+          "remaining_budget": "200.00",
+          "side": "buy",
+          "source": "equity:fictional-equity-layer-1",
+          "spent_budget": "0",
+          "status": "blocked",
+          "strategy_budget": "200.00",
+          "symbol": "QXEN",
+          "trigger_price": "36.00"
+        },
+        {
+          "assumed_limit_price": "35.10",
+          "cash_reserve": "0",
+          "currency": "USD",
+          "data_references": [
+            "snapshot:04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+            "plan:1",
+            "quote:QXEN:2026-10-16T00:00:00+00:00"
+          ],
+          "estimated_fee": "0",
+          "gross_amount": "0.00",
+          "item_id": "item:fictional-etf-plan",
+          "layer_id": null,
+          "maximum_cash_use": "0.00",
+          "non_executable": true,
+          "plan_id": "fictional-etf-plan",
+          "quantity": "0",
+          "quote_time": "2026-10-16T00:00:00Z",
+          "reasons": [
+            "UNKNOWN_RESERVATION_SEMANTICS",
+            "TERMINAL_ORDER_REMAINDER:SAMPLE-ORDER-002",
+            "UNKNOWN_ORDER_RESERVATION_SEMANTICS",
+            "UNKNOWN_OPTION_OBLIGATION"
+          ],
+          "remaining_budget": "930.00",
+          "side": "buy",
+          "source": "etf:fictional-etf-plan",
+          "spent_budget": "70.00",
+          "status": "blocked",
+          "strategy_budget": "1000.00",
+          "symbol": "QXEN",
+          "trigger_price": null
+        }
+      ],
+      "ledger_version": "88f3f74fd14ed7078365b3d4c23b4d80c74e665f410148893a9189d146f600fe",
+      "non_executable": true,
+      "open_order_occupation": "107.00",
+      "plan_fingerprint": "cafa0bd2a0c249c09793c8c8caf3dc7d92de2af5f4312042aa169757e6c3d93e",
+      "plan_version": 1,
+      "replaced_batch_id": null,
+      "review_status": "pending",
+      "reviewed_at": null,
+      "reviewed_by": null,
+      "reviewed_input_fingerprint": null,
+      "snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+      "status": "blocked",
+      "sync_failure_generation": 0
+    },
+    "state": {
+      "as_of": "2026-10-16T00:00:00+00:00",
+      "current_proposal": {
+        "account_id": "fictional-account",
+        "available_cash": "490.00",
+        "batch_id": "proposal:90406868770e5c90d373d8103fdd377bc5e5307ecaeab26556507cb35e8b6354",
+        "blocking_reasons": [
+          "UNKNOWN_RESERVATION_SEMANTICS",
+          "TERMINAL_ORDER_REMAINDER:SAMPLE-ORDER-002",
+          "UNKNOWN_ORDER_RESERVATION_SEMANTICS",
+          "UNKNOWN_OPTION_OBLIGATION"
+        ],
+        "cash_currency": "USD",
+        "fictional": true,
+        "generated_at": "2026-10-16T00:00:00Z",
+        "input_fingerprint": "90406868770e5c90d373d8103fdd377bc5e5307ecaeab26556507cb35e8b6354",
+        "items": [
+          {
+            "assumed_limit_price": "35.10",
+            "cash_reserve": "0",
+            "currency": "USD",
+            "data_references": [
+              "snapshot:04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+              "plan:1",
+              "quote:QXEN:2026-10-16T00:00:00+00:00"
+            ],
+            "estimated_fee": "0",
+            "gross_amount": "0.00",
+            "item_id": "item:fictional-equity-layer-1",
+            "layer_id": "fictional-equity-layer-1",
+            "maximum_cash_use": "0.00",
+            "non_executable": true,
+            "plan_id": "fictional-equity-layer-1",
+            "quantity": "0",
+            "quote_time": "2026-10-16T00:00:00Z",
+            "reasons": [
+              "UNKNOWN_RESERVATION_SEMANTICS",
+              "TERMINAL_ORDER_REMAINDER:SAMPLE-ORDER-002",
+              "UNKNOWN_ORDER_RESERVATION_SEMANTICS",
+              "UNKNOWN_OPTION_OBLIGATION"
+            ],
+            "remaining_budget": "200.00",
+            "side": "buy",
+            "source": "equity:fictional-equity-layer-1",
+            "spent_budget": "0",
+            "status": "blocked",
+            "strategy_budget": "200.00",
+            "symbol": "QXEN",
+            "trigger_price": "36.00"
+          },
+          {
+            "assumed_limit_price": "35.10",
+            "cash_reserve": "0",
+            "currency": "USD",
+            "data_references": [
+              "snapshot:04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+              "plan:1",
+              "quote:QXEN:2026-10-16T00:00:00+00:00"
+            ],
+            "estimated_fee": "0",
+            "gross_amount": "0.00",
+            "item_id": "item:fictional-etf-plan",
+            "layer_id": null,
+            "maximum_cash_use": "0.00",
+            "non_executable": true,
+            "plan_id": "fictional-etf-plan",
+            "quantity": "0",
+            "quote_time": "2026-10-16T00:00:00Z",
+            "reasons": [
+              "UNKNOWN_RESERVATION_SEMANTICS",
+              "TERMINAL_ORDER_REMAINDER:SAMPLE-ORDER-002",
+              "UNKNOWN_ORDER_RESERVATION_SEMANTICS",
+              "UNKNOWN_OPTION_OBLIGATION"
+            ],
+            "remaining_budget": "930.00",
+            "side": "buy",
+            "source": "etf:fictional-etf-plan",
+            "spent_budget": "70.00",
+            "status": "blocked",
+            "strategy_budget": "1000.00",
+            "symbol": "QXEN",
+            "trigger_price": null
+          }
+        ],
+        "ledger_version": "88f3f74fd14ed7078365b3d4c23b4d80c74e665f410148893a9189d146f600fe",
+        "non_executable": true,
+        "open_order_occupation": "107.00",
+        "plan_fingerprint": "cafa0bd2a0c249c09793c8c8caf3dc7d92de2af5f4312042aa169757e6c3d93e",
+        "plan_version": 1,
+        "replaced_batch_id": null,
+        "review_status": "pending",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "reviewed_input_fingerprint": null,
+        "snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+        "status": "blocked",
+        "sync_failure_generation": 0
+      },
+      "current_proposal_state": "current",
+      "ledger_version": "88f3f74fd14ed7078365b3d4c23b4d80c74e665f410148893a9189d146f600fe",
+      "non_executable": true,
+      "proposal_freshness_reasons": [],
+      "snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+      "stale_proposal_batch_id": null,
+      "state": {
+        "account_id": "fictional-account",
+        "complete": true,
+        "cursor": null,
+        "last_attempt_at": "2026-10-16T00:00:00Z",
+        "last_attempt_status": "succeeded",
+        "last_error_code": null,
+        "last_error_message": null,
+        "last_failure_sections": [],
+        "last_success_at": "2026-10-16T00:00:00Z",
+        "last_success_snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+        "pending_fact_ids": []
+      }
+    },
+    "staleState": {
+      "as_of": "2026-10-16T01:00:00+00:00",
+      "current_proposal": null,
+      "current_proposal_state": "stale",
+      "ledger_version": "88f3f74fd14ed7078365b3d4c23b4d80c74e665f410148893a9189d146f600fe",
+      "non_executable": true,
+      "proposal_freshness_reasons": [
+        "QUOTE_STALE:QXEN"
+      ],
+      "snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+      "stale_proposal_batch_id": "proposal:90406868770e5c90d373d8103fdd377bc5e5307ecaeab26556507cb35e8b6354",
+      "state": {
+        "account_id": "fictional-account",
+        "complete": true,
+        "cursor": null,
+        "last_attempt_at": "2026-10-16T00:00:00Z",
+        "last_attempt_status": "succeeded",
+        "last_error_code": null,
+        "last_error_message": null,
+        "last_failure_sections": [],
+        "last_success_at": "2026-10-16T00:00:00Z",
+        "last_success_snapshot_id": "04a5d4edbc6ef0851362c30043c007e14334f3560b48af680b201f7fe9486326",
+        "pending_fact_ids": []
+      }
+    }
+  }
+}

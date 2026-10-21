@@ -1,0 +1,13 @@
+{
+  "complete": true,
+  "truncated": false,
+  "sourceAsOf": "2026-10-16T00:00:00+00:00",
+  "sections": [
+    "account",
+    "positions",
+    "orders",
+    "transactions",
+    "fills",
+    "quotes"
+  ]
+}

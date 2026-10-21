@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quant-stack.local/schemas/data/corporate_action/1.0.0",
+  "title": "QuantStack Corporate Action",
+  "type": "object", "additionalProperties": false,
+  "required": ["instrument_id", "market", "action_id", "action_type", "ex_date", "announced_at", "status"],
+  "properties": {
+    "instrument_id": {"type": "string"}, "market": {"enum": ["CN", "HK", "US"]},
+    "action_id": {"type": "string"}, "action_type": {"enum": ["cash_dividend", "stock_split", "rights_issue", "symbol_change", "delisting"]},
+    "ex_date": {"type": "string", "format": "date"}, "announced_at": {"type": "string", "format": "date-time"},
+    "payment_date": {"type": ["string", "null"], "format": "date"}, "ratio": {"type": ["number", "null"]},
+    "cash_amount": {"type": ["number", "null"]}, "currency": {"enum": ["CNY", "HKD", "USD", null]},
+    "status": {"enum": ["estimated", "confirmed", "cancelled"]}, "source_revision": {"type": ["string", "null"]}
+  }
+}
