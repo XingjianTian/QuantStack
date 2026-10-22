@@ -23,7 +23,9 @@ Lab using isolated synthetic responses. The metrics and equity curve are
 illustrative, not measured backtest results or live infrastructure acceptance.
 No product code, provider requests, account data or deployment changed.
 
-The README gallery now leads with a K-line workspace from real Stock Screener
-chart/detail components in an isolated capture environment, deterministic demo
-OHLCV, and our existing Chinese/navigation layer. It is explicitly illustrative,
-not a production snapshot or acceptance of the full downstream patch stack.
+The README gallery now leads with a direct browser capture of the deployed
+Stock Screener AAPL page (2026-10-22), replacing the synthetic K-line illustration.
+Candles, moving averages, volume and the partial-data warning are unchanged from
+the actual page. Only browser chrome and deployment addresses are outside the
+frame. This does not establish real-time quote freshness or full integration
+acceptance. The other gallery images remain explicitly synthetic.

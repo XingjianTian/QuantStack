@@ -13,16 +13,20 @@ without rebuilding the workflow for every strategy.
 
 ## Interface preview
 
-Captured from the actual web clients using isolated, synthetic API responses.
-Names, dataset locations, counts, returns and the equity curve are illustrative;
-they do not represent a real account, measured performance or live service health.
+The K-line screenshot below was captured directly from a running, self-hosted
+Stock Screener deployment on October 22, 2026. It shows the application's actual
+AAPL chart, moving averages and volume; no synthetic OHLCV or mocked API responses
+were used. The visible partial-data warning is preserved.
 
-![K-line workspace: candlesticks, moving averages, volume and stock metrics](docs/assets/screenshots/kline-workspace.png)
+![Actual Stock Screener deployment: AAPL candlesticks, moving averages and volume](docs/assets/screenshots/kline-workspace-live.jpg)
 
-*Stock Screener integration preview: real chart/detail components with deterministic
-synthetic OHLCV and demo metadata, plus QuantStack's shared navigation and Chinese
-localization. This is an isolated interface illustration, not a production market
-snapshot or a verified trade signal. Upstream: [Stock Screener](https://github.com/xang1234/stock-screener), Apache-2.0.*
+*Actual application capture, not a claim of real-time market freshness or a trade
+signal. Browser chrome and deployment addresses are excluded from the frame.
+Upstream: [Stock Screener](https://github.com/xang1234/stock-screener), Apache-2.0.*
+
+The Quant Center, data catalog and Nautilus Lab images below use isolated,
+synthetic API responses. Their names, dataset locations, counts, returns and equity
+curve are illustrative, not real account data or measured performance.
 
 <details>
 <summary><strong>Quant Center overview</strong></summary>
