@@ -17,7 +17,19 @@ Captured from the actual web clients using isolated, synthetic API responses.
 Names, dataset locations, counts, returns and the equity curve are illustrative;
 they do not represent a real account, measured performance or live service health.
 
+![K-line workspace: candlesticks, moving averages, volume and stock metrics](docs/assets/screenshots/kline-workspace.png)
+
+*Stock Screener integration preview: real chart/detail components with deterministic
+synthetic OHLCV and demo metadata, plus QuantStack's shared navigation and Chinese
+localization. This is an isolated interface illustration, not a production market
+snapshot or a verified trade signal. Upstream: [Stock Screener](https://github.com/xang1234/stock-screener), Apache-2.0.*
+
+<details>
+<summary><strong>Quant Center overview</strong></summary>
+
 ![Quant Center: research overview and connected workflow](docs/assets/screenshots/quant-center.png)
+
+</details>
 
 <table>
   <tr><th>Versioned data catalog</th><th>Nautilus research workspace</th></tr>

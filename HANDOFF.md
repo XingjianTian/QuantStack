@@ -22,3 +22,8 @@ README interface screenshots now show Quant Center, the data catalog and Nautilu
 Lab using isolated synthetic responses. The metrics and equity curve are
 illustrative, not measured backtest results or live infrastructure acceptance.
 No product code, provider requests, account data or deployment changed.
+
+The README gallery now leads with a K-line workspace from real Stock Screener
+chart/detail components in an isolated capture environment, deterministic demo
+OHLCV, and our existing Chinese/navigation layer. It is explicitly illustrative,
+not a production snapshot or acceptance of the full downstream patch stack.
