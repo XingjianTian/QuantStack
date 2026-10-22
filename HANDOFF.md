@@ -17,3 +17,8 @@ explicit test skips and must be reported separately from passing checks.
 Obsolete one-off image/dependency planning tools tied to historical commit IDs
 were retired. Dependency lockfile hashes, container digests and market-data
 integrity checks remain part of the supported build and data contracts.
+
+README interface screenshots now show Quant Center, the data catalog and Nautilus
+Lab using isolated synthetic responses. The metrics and equity curve are
+illustrative, not measured backtest results or live infrastructure acceptance.
+No product code, provider requests, account data or deployment changed.

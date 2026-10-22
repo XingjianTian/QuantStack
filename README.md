@@ -11,6 +11,22 @@ without rebuilding the workflow for every strategy.
 
 ![QuantStack workflow: typed market data, versioned strategies, Nautilus backtests and traceable experiment evidence.](docs/assets/readme-workflow.svg)
 
+## Interface preview
+
+Captured from the actual web clients using isolated, synthetic API responses.
+Names, dataset locations, counts, returns and the equity curve are illustrative;
+they do not represent a real account, measured performance or live service health.
+
+![Quant Center: research overview and connected workflow](docs/assets/screenshots/quant-center.png)
+
+<table>
+  <tr><th>Versioned data catalog</th><th>Nautilus research workspace</th></tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/data-catalog.png" alt="Synthetic dataset manifests, provenance and storage boundaries" width="600"></td>
+    <td><img src="docs/assets/screenshots/nautilus-lab.png" alt="Nautilus strategy specifications, illustrative equity curve and experiment records" width="600"></td>
+  </tr>
+</table>
+
 ## Built for systematic research
 
 | Capability | What it gives you |
