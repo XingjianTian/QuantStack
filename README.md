@@ -1,5 +1,7 @@
 # QuantStack
 
+**English (primary)** | [简体中文](README.zh-CN.md)
+
 **Market data you can trust. Research you can reproduce.**
 
 QuantStack connects market-data contracts, strategy specifications and NautilusTrader
